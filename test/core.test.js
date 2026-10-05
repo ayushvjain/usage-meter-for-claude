@@ -298,6 +298,72 @@ test('a failing refresh still schedules the next one', async () => {
   assert.equal(s.nextAt, FIVE_MIN);
 });
 
+/* ---------- Desktop layer: the widget stays on the desktop ---------- */
+
+// A fake Windows window stack, listed top to bottom as [handle, class].
+function windowStack(list) {
+  const stack = list.map(([h, cls]) => ({ h, cls }));
+  const index = (h) => stack.findIndex((w) => w.h === h);
+  return {
+    classOf: (h) => (stack[index(h)] || {}).cls || '',
+    windowAbove: (h) => {
+      const i = index(h);
+      return i > 0 ? stack[i - 1].h : 0;
+    },
+    // What SetWindowPos(self, insertAfter) does: move self directly below insertAfter.
+    apply(self, insertAfter) {
+      const [me] = stack.splice(index(self), 1);
+      stack.splice(insertAfter === core.HWND_TOP ? 0 : index(insertAfter) + 1, 0, me);
+    },
+    order: () => stack.map((w) => w.h),
+  };
+}
+
+const WIDGET = 100;
+const PROGMAN = 1;
+
+function settle(stack, foreground) {
+  const plan = core.planDesktopPlacement({ self: WIDGET, foreground, progman: PROGMAN, classOf: stack.classOf, windowAbove: stack.windowAbove });
+  if (plan.action === 'place') stack.apply(WIDGET, plan.insertAfter);
+  return plan;
+}
+
+test('desktop: a widget raised above apps (for example after a click) drops back onto the desktop', () => {
+  const stack = windowStack([[WIDGET, 'Chrome_WidgetWin_1'], [20, 'Notepad'], [30, 'CabinetWClass'], [PROGMAN, 'Progman']]);
+  settle(stack, 20);
+  assert.deepEqual(stack.order(), [20, 30, WIDGET, PROGMAN], 'widget sits directly above the desktop, below every app');
+});
+
+test('desktop: once in place, nothing moves', () => {
+  const stack = windowStack([[20, 'Notepad'], [WIDGET, 'Chrome_WidgetWin_1'], [PROGMAN, 'Progman']]);
+  assert.equal(settle(stack, 20).action, 'none');
+});
+
+test('desktop: sits above every desktop window, including the wallpaper layer', () => {
+  const stack = windowStack([[20, 'Notepad'], [WIDGET, 'Chrome_WidgetWin_1'], [7, 'WorkerW'], [8, 'WorkerW'], [PROGMAN, 'Progman']]);
+  settle(stack, 20);
+  assert.deepEqual(stack.order(), [20, WIDGET, 7, 8, PROGMAN]);
+});
+
+test('desktop: Win+D (Show desktop) brings the widget up with the desktop', () => {
+  // Windows raises a desktop window above the apps and focuses it.
+  const stack = windowStack([[9, 'WorkerW'], [20, 'Notepad'], [WIDGET, 'Chrome_WidgetWin_1'], [PROGMAN, 'Progman']]);
+  settle(stack, 9);
+  assert.deepEqual(stack.order(), [WIDGET, 9, 20, PROGMAN], 'widget is visible on top of the shown desktop');
+});
+
+test('desktop: switching back to an app after Win+D puts the widget behind it again', () => {
+  const stack = windowStack([[20, 'Notepad'], [WIDGET, 'Chrome_WidgetWin_1'], [9, 'WorkerW'], [PROGMAN, 'Progman']]);
+  settle(stack, 20);
+  // The raised desktop window went back down with the app restore, so the widget joins it above the desktop.
+  assert.deepEqual(stack.order(), [20, WIDGET, 9, PROGMAN]);
+});
+
+test('desktop: without a desktop window to anchor to, nothing moves', () => {
+  const plan = core.planDesktopPlacement({ self: WIDGET, foreground: 0, progman: 0, classOf: () => '', windowAbove: () => 0 });
+  assert.equal(plan.action, 'none');
+});
+
 /* ---------- Every source file parses ---------- */
 
 test('all JavaScript files are syntactically valid', () => {
