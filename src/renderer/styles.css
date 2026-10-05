@@ -1,0 +1,412 @@
+/*
+  Built-in styles. To customise the look, edit your theme.css instead
+  (tray menu > Edit theme…). Every colour and size below is a variable.
+*/
+
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-numbers: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+
+  --bg: rgba(19, 27, 41, 0.9);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e9eef5;
+  --muted: #8e9bb0;
+  --track: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+
+  --ok: #56c6b0;
+  --warn: #f2b544;
+  --danger: #f07178;
+  --peak: #a796f5;
+  --off-peak: #56c6b0;
+
+  --radius: 16px;
+  --pad: 16px;
+  --hero-size: 34px;
+  --bar-height: 6px;
+  --hero-bar-height: 10px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: rgba(247, 249, 252, 0.94);
+    --border: rgba(16, 28, 48, 0.1);
+    --text: #16202e;
+    --muted: #5b6980;
+    --track: rgba(16, 28, 48, 0.08);
+    --hover: rgba(16, 28, 48, 0.06);
+    --ok: #1a9682;
+    --warn: #c4860a;
+    --danger: #d2414d;
+    --peak: #6c58d6;
+    --off-peak: #1a9682;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Sections toggled with the hidden attribute must stay hidden whatever display a theme sets. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.widget {
+  margin: 0;
+  padding: var(--pad);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ---------- Header (drag handle) ---------- */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  -webkit-app-region: drag;
+  margin: -4px -6px -4px 0;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Shown only for people with more than one organization. */
+.org-name {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 210px;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible,
+.primary-btn:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.icon-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.widget[data-status="loading"] #refresh svg {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Limits ---------- */
+
+.limits {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.limits:empty {
+  display: none;
+}
+
+.limit {
+  --level: var(--ok);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  row-gap: 6px;
+}
+
+.limit[data-level="warn"] {
+  --level: var(--warn);
+}
+
+.limit[data-level="danger"] {
+  --level: var(--danger);
+}
+
+.limit-label {
+  font-weight: 500;
+}
+
+.limit-value {
+  font-family: var(--font-numbers);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.track {
+  grid-column: 1 / -1;
+  height: var(--bar-height);
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  width: var(--p, 0%);
+  border-radius: inherit;
+  background: var(--level);
+  transition: width 0.5s ease;
+}
+
+.limit-reset {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The 5-hour session is the number people check most, so it gets the large treatment. */
+.limit--hero {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.limit--hero .limit-value {
+  font-size: var(--hero-size);
+  line-height: 1;
+  color: var(--level);
+  letter-spacing: -0.02em;
+}
+
+.limit--hero .limit-value small {
+  font-size: 0.5em;
+  font-weight: 500;
+  margin-left: 1px;
+}
+
+.limit--hero .track {
+  height: var(--hero-bar-height);
+}
+
+/* ---------- Notices ---------- */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.notice--error p {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.primary-btn {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 600;
+  background: var(--ok);
+  color: #0d1a1c;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- Organization picker ---------- */
+
+.org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.org-option:hover {
+  background: var(--hover);
+}
+
+.org-option:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.org-option-name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.org-option-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.org-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- Peak hours ---------- */
+
+.peak {
+  --state: var(--off-peak);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.peak[data-state="peak"] {
+  --state: var(--peak);
+}
+
+.peak-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.peak-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state);
+  flex: none;
+}
+
+.peak-label {
+  font-weight: 500;
+}
+
+.peak-countdown {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-strip {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.day-strip .segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--peak);
+  opacity: 0.75;
+}
+
+.now-marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+}
+
+.strip-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget[data-status="loading"] #refresh svg {
+    animation: none;
+  }
+  .fill {
+    transition: none;
+  }
+}
