@@ -8,7 +8,6 @@ const { clampRefreshMinutes, DEFAULT_REFRESH_MINUTES } = require('../shared/core
 const DEFAULTS = Object.freeze({
   refreshMinutes: DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
-  alwaysOnTop: true,
   startWithWindows: false,
   warnAt: 60,
   dangerAt: 85,
@@ -20,11 +19,14 @@ function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
+// Settings from older versions that no longer exist.
+const RETIRED = ['alwaysOnTop'];
+
 function sanitize(input) {
   const s = { ...DEFAULTS, ...(input && typeof input === 'object' ? input : {}) };
+  RETIRED.forEach((key) => delete s[key]);
   s.refreshMinutes = clampRefreshMinutes(s.refreshMinutes);
   s.showPeakHours = Boolean(s.showPeakHours);
-  s.alwaysOnTop = Boolean(s.alwaysOnTop);
   s.startWithWindows = Boolean(s.startWithWindows);
   s.warnAt = Number.isFinite(Number(s.warnAt)) ? Number(s.warnAt) : DEFAULTS.warnAt;
   s.dangerAt = Number.isFinite(Number(s.dangerAt)) ? Number(s.dangerAt) : DEFAULTS.dangerAt;

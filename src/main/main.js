@@ -6,6 +6,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage } = 
 const { RefreshScheduler, parseUsage, clampRefreshMinutes } = require('../shared/core');
 const config = require('./config');
 const { ClaudeClient, AuthError, NoPlanError } = require('./claude');
+const desktopLayer = require('./desktop-layer');
 
 const WIDGET_WIDTH = 320;
 const DEFAULT_HEIGHT = 260;
@@ -17,6 +18,7 @@ const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const client = new ClaudeClient();
 let settings = null;
 let widget = null;
+let desktopPin = null;
 let tray = null;
 let scheduler = null;
 let state = { status: 'loading', limits: [], fetchedAt: null, nextRefreshAt: null, message: null, org: null, orgCount: 0, orgChoices: [] };
@@ -153,7 +155,10 @@ function createWidget() {
     minimizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    alwaysOnTop: settings.alwaysOnTop,
+    // "toolbar" makes it a tool window: no taskbar button and not listed in Alt+Tab.
+    type: 'toolbar',
+    // A desktop widget sits below app windows; desktop-layer.js keeps it there.
+    alwaysOnTop: false,
     show: false,
     title: 'Usage Meter for Claude',
     webPreferences: {
@@ -165,7 +170,10 @@ function createWidget() {
   });
 
   widget.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
-  widget.once('ready-to-show', () => widget.show());
+  widget.once('ready-to-show', () => {
+    widget.showInactive();
+    desktopPin = desktopLayer.attach(widget);
+  });
 
   let saveTimer = null;
   widget.on('moved', () => {
@@ -178,6 +186,8 @@ function createWidget() {
   });
 
   widget.on('closed', () => {
+    if (desktopPin) desktopPin.detach();
+    desktopPin = null;
     widget = null;
   });
 
@@ -189,9 +199,12 @@ function createWidget() {
 }
 
 function showWidget() {
-  if (!widget) createWidget();
-  widget.show();
-  widget.focus();
+  if (!widget) {
+    createWidget();
+    return;
+  }
+  // Show without focusing, so the widget stays on the desktop instead of jumping over apps.
+  widget.showInactive();
 }
 
 function toggleWidget() {
@@ -246,15 +259,6 @@ function buildMenu() {
       type: 'checkbox',
       checked: settings.showPeakHours,
       click: (item) => updateSetting('showPeakHours', item.checked),
-    },
-    {
-      label: 'Always on top',
-      type: 'checkbox',
-      checked: settings.alwaysOnTop,
-      click: (item) => {
-        updateSetting('alwaysOnTop', item.checked);
-        if (widget) widget.setAlwaysOnTop(item.checked);
-      },
     },
     {
       // Store (MSIX) builds manage startup through Windows Settings > Apps > Startup instead.

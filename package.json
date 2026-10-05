@@ -13,6 +13,9 @@
     "dist": "electron-builder --win nsis",
     "dist:store": "electron-builder --win appx"
   },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
   "devDependencies": {
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0"
@@ -30,8 +33,13 @@
       "package.json",
       "LICENSE"
     ],
+    "asarUnpack": [
+      "node_modules/koffi/**"
+    ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.png"
     },
     "nsis": {
@@ -46,7 +54,9 @@
       "publisherDisplayName": "REPLACE_WITH_PUBLISHER_DISPLAY_NAME",
       "displayName": "Usage Meter for Claude",
       "backgroundColor": "#131B29",
-      "languages": ["en-US"]
+      "languages": [
+        "en-US"
+      ]
     }
   }
 }
