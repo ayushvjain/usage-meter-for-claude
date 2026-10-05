@@ -253,6 +253,49 @@
     return Math.min(MAX_REFRESH_MINUTES, Math.max(MIN_REFRESH_MINUTES, Math.round(n)));
   }
 
+  /* ---------- Desktop layer (Windows) ---------- */
+
+  // SetWindowPos "insert after" value that means the top of the normal (non-topmost) band.
+  const HWND_TOP = 0;
+  const DESKTOP_CLASSES = ['Progman', 'WorkerW'];
+
+  /**
+   * Decides where the widget window should sit so it lives on the desktop: directly above
+   * the Windows desktop (wallpaper and icons) and below every app window.
+   *
+   * Windows keeps top-level windows in one stack. The desktop itself is made of shell
+   * windows of class "Progman" and "WorkerW" at the bottom of that stack. When the user
+   * presses Win+D (Show desktop), Windows raises a desktop window above the apps and gives
+   * it focus, so the widget follows it up and stays visible.
+   *
+   * Inputs are plain functions so this can be tested without Windows:
+   *   self         the widget's window handle
+   *   foreground   the last focused window that isn't the widget or the taskbar
+   *   progman      the main desktop window (FindWindow "Progman"), or 0
+   *   classOf(h)   window class name of h
+   *   windowAbove(h)  the window directly above h in the stack, or 0
+   *
+   * Returns { action: 'none' } when the widget is already in place, or
+   * { action: 'place', insertAfter } for SetWindowPos(self, insertAfter, ...), which puts
+   * the widget directly below insertAfter (that is, directly above the desktop).
+   */
+  function planDesktopPlacement({ self, foreground, progman, classOf, windowAbove }) {
+    const isDesktop = (h) => Boolean(h) && DESKTOP_CLASSES.includes(classOf(h));
+    let anchor = isDesktop(foreground) ? foreground : progman;
+    if (!anchor) return { action: 'none' };
+
+    // The desktop can be several shell windows stacked together; sit above all of them.
+    for (let guard = 0; guard < 64; guard += 1) {
+      const above = windowAbove(anchor);
+      if (above && above !== self && isDesktop(above)) anchor = above;
+      else break;
+    }
+
+    const above = windowAbove(anchor);
+    if (above === self) return { action: 'none' };
+    return { action: 'place', insertAfter: above || HWND_TOP };
+  }
+
   /* ---------- Refresh scheduling ---------- */
 
   /**
@@ -334,5 +377,7 @@
     formatClock,
     clampRefreshMinutes,
     RefreshScheduler,
+    HWND_TOP,
+    planDesktopPlacement,
   };
 });
