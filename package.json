@@ -1,0 +1,52 @@
+{
+  "name": "usage-meter-for-claude",
+  "productName": "Usage Meter for Claude",
+  "version": "0.1.0",
+  "description": "A small Windows desktop widget that shows your Claude session and weekly usage, reset countdowns and peak hours.",
+  "main": "src/main/main.js",
+  "author": "Ayush",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/core.test.js",
+    "dist": "electron-builder --win nsis",
+    "dist:store": "electron-builder --win appx"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.usagemeter.claude",
+    "productName": "Usage Meter for Claude",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json",
+      "LICENSE"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Usage Meter for Claude"
+    },
+    "appx": {
+      "applicationId": "UsageMeterForClaude",
+      "identityName": "REPLACE_WITH_PACKAGE_IDENTITY_NAME",
+      "publisher": "CN=REPLACE_WITH_PUBLISHER_ID",
+      "publisherDisplayName": "REPLACE_WITH_PUBLISHER_DISPLAY_NAME",
+      "displayName": "Usage Meter for Claude",
+      "backgroundColor": "#131B29",
+      "languages": ["en-US"]
+    }
+  }
+}
