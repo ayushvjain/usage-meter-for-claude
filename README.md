@@ -74,9 +74,20 @@ claude.ai has a private endpoint that powers its own Usage page:
 GET https://claude.ai/api/organizations/<org_id>/usage
 ```
 
-The widget keeps your claude.ai sign-in in its own browser profile (an Electron session partition), like a separate browser. A hidden window on the claude.ai origin calls that endpoint, so requests behave like a normal browser tab. The org ID comes from the `lastActiveOrg` cookie, or from `/api/organizations` if that cookie is missing or stale.
+The widget keeps your claude.ai sign-in in its own browser profile (an Electron session partition), like a separate browser. A hidden window on the claude.ai origin calls that endpoint, so requests behave like a normal browser tab.
 
-All claude.ai logic lives in `src/main/claude.js`. If claude.ai changes its endpoints, that is the file to fix.
+The response includes a `limits` list. Each entry has a group (`session` or `weekly`), a percent, a reset time and, for limits that apply to one model or product, a name supplied by claude.ai (for example "Cowork"). The widget draws one bar per entry, so every plan, and any new model or product limit, shows up without code changes. If the list is missing or empty, the widget falls back to the older `five_hour` and `seven_day_<name>` keys. Other keys in the response are ignored.
+
+### Accounts with more than one organization
+
+Many people belong to several organizations, such as a personal plan and a work or university Enterprise seat. Each one has its own limits, so the widget never guesses:
+
+- With **one** claude.ai organization, the widget shows it straight away.
+- With **two or more**, the widget asks which one to show and remembers the choice. The organization currently selected on claude.ai is marked to help you pick. Change it later under **Organization** in the menu. The chosen organization's name appears under the widget title.
+- API-only organizations (Claude Console accounts) have no session or weekly limits, so they are never listed.
+- If you leave the chosen organization, the widget asks again. Signing out clears the choice.
+
+All claude.ai logic lives in `src/main/claude.js`, and response parsing lives in `src/shared/core.js`. If claude.ai changes its endpoints, those are the files to fix. `test/fixtures/` holds real responses for the tests.
 
 ### Privacy
 
@@ -117,7 +128,8 @@ src/
   shared/
     core.js              pure logic: peak hours, usage parsing, formatting, refresh scheduler
 test/
-  core.test.js
+  core.test.js           logic tests and a syntax check of every source file
+  fixtures/              real claude.ai usage responses used by the tests
 ```
 
 `src/shared/core.js` has no dependencies and is loaded by both the main process and the widget, so the tests cover the same code the app runs.
@@ -143,12 +155,16 @@ Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/m
 
 ## Verify a build
 
-1. `npm test` passes (18 tests).
-2. `npm start`, then sign in. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
+1. `npm test` passes (31 tests).
+2. `npm start`, then sign in. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
 3. Wait a minute and click refresh. The footer jumps back to about "Next refresh in 5:00" instead of continuing the old countdown.
 4. Choose **Edit theme…**, set `--ok: hotpink;` and save. The session bar turns pink within a second.
 5. Choose **Sign out**. The widget asks you to sign in again.
 
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request, and report security issues privately as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT
+[MIT](LICENSE)
