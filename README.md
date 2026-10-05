@@ -31,7 +31,9 @@ Download the latest installer from [Releases](../../releases), or get it from th
 
 On first launch, click **Sign in** and sign in to claude.ai in the window that opens. The window closes on its own once you're signed in.
 
-The widget lives in the system tray. Click the tray icon to show or hide it, and right-click it (or click the `⋯` button on the widget) for the menu. Drag the widget by its title to move it. It remembers where you put it.
+It's a desktop widget: it sits on your desktop, above the wallpaper and icons and below every app window. Open windows cover it, just like desktop icons, and pressing **Win+D** (Show desktop) brings it into view. It doesn't appear in the taskbar or in Alt+Tab.
+
+Drag the widget by its title to move it; it remembers where you put it. Click the `⋯` button on the widget, or right-click the tray icon, for the menu. Clicking the tray icon hides or shows the widget.
 
 ## Make it yours
 
@@ -97,6 +99,8 @@ All claude.ai logic lives in `src/main/claude.js`, and response parsing lives in
 
 ### Known limits
 
+- Staying on the desktop layer uses standard Windows calls (`SetWindowPos` and friends, through the prebuilt [koffi](https://koffi.dev) library) because Electron has no setting for it. If those calls are unavailable, the widget behaves like a normal window instead. To see what it detects, run it with `$env:USAGE_METER_DEBUG_DESKTOP=1; npm start`.
+
 - The endpoint is undocumented and can change without notice. When it does, the widget shows an error instead of wrong numbers.
 - If claude.ai shows a browser check, choose **Open claude.ai** from the menu, let the page load, then refresh.
 - Some sign-in providers are strict about embedded browsers. If Google sign-in is refused, use the email option on the claude.ai sign-in page.
@@ -117,6 +121,7 @@ Project layout:
 src/
   main/
     main.js              app lifecycle, widget window, tray menu, refresh scheduling
+    desktop-layer.js     keeps the widget on the desktop, below app windows
     claude.js            sign-in window and claude.ai requests
     config.js            settings file
     preload.js           the small API the widget page can call
@@ -155,11 +160,12 @@ Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/m
 
 ## Verify a build
 
-1. `npm test` passes (31 tests).
+1. `npm test` passes (37 tests).
 2. `npm start`, then sign in. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
-3. Wait a minute and click refresh. The footer jumps back to about "Next refresh in 5:00" instead of continuing the old countdown.
-4. Choose **Edit theme…**, set `--ok: hotpink;` and save. The session bar turns pink within a second.
-5. Choose **Sign out**. The widget asks you to sign in again.
+3. Open an app window over the widget: it covers the widget. Click a visible part of the widget: it stays behind the app. Press Win+D: the widget is visible. Press Win+D again: the apps cover it again.
+4. Wait a minute and click refresh. The footer jumps back to about "Next refresh in 5:00" instead of continuing the old countdown.
+5. Choose **Edit theme…**, set `--ok: hotpink;` and save. The session bar turns pink within a second.
+6. Choose **Sign out**. The widget asks you to sign in again.
 
 ## Contributing
 
