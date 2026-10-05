@@ -1,0 +1,40 @@
+[
+  {
+    "uuid": "00000000-0000-4000-8000-000000000001",
+    "name": "Example University",
+    "capabilities": [
+      "raven",
+      "analytics_api",
+      "compliance_logging",
+      "raven_enterprise",
+      "chat",
+      "compliance_api",
+      "customer_terms:negotiated"
+    ],
+    "raven_type": "enterprise"
+  },
+  {
+    "uuid": "00000000-0000-4000-8000-000000000002",
+    "name": "Personal API org",
+    "capabilities": [
+      "api",
+      "api_individual",
+      "customer_terms:standard"
+    ],
+    "raven_type": null
+  },
+  {
+    "uuid": "00000000-0000-4000-8000-000000000003",
+    "name": "Premium Seat - Example University",
+    "capabilities": [
+      "compliance_logging",
+      "raven",
+      "chat",
+      "analytics_api",
+      "raven_enterprise",
+      "compliance_api",
+      "customer_terms:negotiated"
+    ],
+    "raven_type": "enterprise"
+  }
+]
