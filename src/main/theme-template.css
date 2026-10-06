@@ -5,40 +5,42 @@
   for everything else. It loads after the built-in styles and the Settings choices, so
   anything here wins. Save the file and the widget updates within a second.
 
-  Start by uncommenting a variable below and changing its value.
+  How to use it:
+  1. Delete the two comment-marker lines (slash-star above, star-slash below) that wrap
+     the :root block further down, so the block takes effect.
+  2. Delete the variables you don't want to change, and edit the rest.
   To go back to the default look, delete everything in this file.
 */
 
+/*
 :root {
-  /* Panel */
-  /* --bg: rgba(19, 27, 41, 0.9);   overrides the theme and the opacity setting */
-  /* --border: rgba(255, 255, 255, 0.08); */
-  /* --radius: 14px; */
-  /* --pad: 16px; */
+  --bg: rgba(19, 27, 41, 0.9);
+  --border: rgba(255, 255, 255, 0.08);
+  --radius: 14px;
+  --pad: 16px;
 
-  /* Text */
-  /* --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; */
-  /* --font-numbers: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; */
-  /* --text: #e9eef5; */
-  /* --muted: #8e9bb0; */
-  /* --hero-size: 34px; */
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-numbers: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --text: #e9eef5;
+  --muted: #8e9bb0;
+  --hero-size: 34px;
 
-  /* Bars */
-  /* --track: rgba(255, 255, 255, 0.08); */
-  /* --bar-height: 6px; */
-  /* --hero-bar-height: 10px; */
-  /* --ok: #56c6b0; */
-  /* --warn: #f2b544; */
-  /* --danger: #f07178; */
+  --track: rgba(255, 255, 255, 0.08);
+  --bar-height: 6px;
+  --hero-bar-height: 10px;
+  --ok: #56c6b0;
+  --warn: #f2b544;
+  --danger: #f07178;
 
-  /* Peak hours */
-  /* --peak: #a796f5; */
-  /* --off-peak: #56c6b0; */
+  --peak: #a796f5;
+  --off-peak: #56c6b0;
 }
+*/
 
-/* You can also restyle any element. Examples:
+/*
+  You can also restyle any element. Examples:
 
-.limit-label { letter-spacing: 0.02em; }
-.peak { display: none; }               hide the peak-hours section
-.footer { opacity: 0.6; }
+  .limit-label { letter-spacing: 0.02em; }
+  .peak { display: none; }
+  .footer { opacity: 0.6; }
 */
