@@ -1,47 +1,105 @@
 /*
-  Built-in styles. To customise the look, edit your theme.css instead
-  (tray menu > Edit theme…). Every colour and size below is a variable.
+  Built-in styles. Theme, accent colour, opacity and size are set in Settings.
+  Developers can override anything below with custom CSS (Settings > Appearance >
+  Custom CSS), since every colour and size is a variable.
 */
+
+/* ---------- Tokens ---------- */
 
 :root {
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-numbers: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 
-  --bg: rgba(19, 27, 41, 0.9);
+  /* Transparent margin between the panel and the edge of its tiles. Must match TILE_INSET in main.js. */
+  --tile-inset: 4px;
+  --radius: 14px;
+  --pad: 16px;
+  --hero-size: 34px;
+  --bar-height: 6px;
+  --hero-bar-height: 10px;
+
+  /* Opacity comes from Settings; colours below come from the theme and accent. */
+  --bg-alpha: 0.9;
+
+  /* Accent presets: one shade for dark panels, one for light. */
+  --accent-on-dark: #56c6b0;
+  --accent-on-light: #1a9682;
+}
+
+:root[data-accent="blue"] {
+  --accent-on-dark: #6aa8ff;
+  --accent-on-light: #2563eb;
+}
+
+:root[data-accent="violet"] {
+  --accent-on-dark: #a796f5;
+  --accent-on-light: #6c58d6;
+}
+
+:root[data-accent="amber"] {
+  --accent-on-dark: #f2b544;
+  --accent-on-light: #b7790a;
+}
+
+:root[data-accent="rose"] {
+  --accent-on-dark: #f48fb1;
+  --accent-on-light: #c2416f;
+}
+
+/* Dark theme (the default, and "System" when Windows is in dark mode). */
+:root {
+  --bg-rgb: 19, 27, 41;
   --border: rgba(255, 255, 255, 0.08);
   --text: #e9eef5;
   --muted: #8e9bb0;
   --track: rgba(255, 255, 255, 0.08);
   --hover: rgba(255, 255, 255, 0.08);
-
-  --ok: #56c6b0;
+  --ok: var(--accent-on-dark);
   --warn: #f2b544;
   --danger: #f07178;
   --peak: #a796f5;
-  --off-peak: #56c6b0;
-
-  --radius: 16px;
-  --pad: 16px;
-  --hero-size: 34px;
-  --bar-height: 6px;
-  --hero-bar-height: 10px;
+  --off-peak: var(--accent-on-dark);
+  --on-accent: #0d1a1c;
 }
 
+/* Light theme: chosen in Settings, or "System" when Windows is in light mode. */
 @media (prefers-color-scheme: light) {
-  :root {
-    --bg: rgba(247, 249, 252, 0.94);
+  :root:not([data-theme="dark"]) {
+    --bg-rgb: 247, 249, 252;
     --border: rgba(16, 28, 48, 0.1);
     --text: #16202e;
     --muted: #5b6980;
     --track: rgba(16, 28, 48, 0.08);
     --hover: rgba(16, 28, 48, 0.06);
-    --ok: #1a9682;
+    --ok: var(--accent-on-light);
     --warn: #c4860a;
     --danger: #d2414d;
     --peak: #6c58d6;
-    --off-peak: #1a9682;
+    --off-peak: var(--accent-on-light);
+    --on-accent: #ffffff;
   }
 }
+
+:root[data-theme="light"] {
+  --bg-rgb: 247, 249, 252;
+  --border: rgba(16, 28, 48, 0.1);
+  --text: #16202e;
+  --muted: #5b6980;
+  --track: rgba(16, 28, 48, 0.08);
+  --hover: rgba(16, 28, 48, 0.06);
+  --ok: var(--accent-on-light);
+  --warn: #c4860a;
+  --danger: #d2414d;
+  --peak: #6c58d6;
+  --off-peak: var(--accent-on-light);
+  --on-accent: #ffffff;
+}
+
+:root {
+  --bg: rgba(var(--bg-rgb), var(--bg-alpha));
+}
+
+/* ---------- Layout ---------- */
 
 * {
   box-sizing: border-box;
@@ -55,6 +113,7 @@
 html,
 body {
   margin: 0;
+  height: 100%;
   background: transparent;
   overflow: hidden;
   font-family: var(--font);
@@ -65,15 +124,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body {
+  padding: var(--tile-inset);
+}
+
+/* The panel fills its tiles; the footer sits at the bottom of the last tile. */
 .widget {
+  height: 100%;
   margin: 0;
   padding: var(--pad);
+  color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footer {
+  margin-top: auto;
 }
 
 /* ---------- Header (drag handle) ---------- */
@@ -262,12 +338,17 @@ body {
   font: inherit;
   font-weight: 600;
   background: var(--ok);
-  color: #0d1a1c;
+  color: var(--on-accent);
   cursor: pointer;
 }
 
 .primary-btn:hover {
   filter: brightness(1.08);
+}
+
+.primary-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 /* ---------- Organization picker ---------- */

@@ -2,27 +2,43 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage } = require('electron');
-const { RefreshScheduler, parseUsage, clampRefreshMinutes } = require('../shared/core');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage, nativeTheme } = require('electron');
+const { RefreshScheduler, parseUsage, gridLayout, snapToGrid, defaultTile, WIDGET_SIZES, ACCENTS, OPACITY_RANGE } = require('../shared/core');
 const config = require('./config');
 const { ClaudeClient, AuthError, NoPlanError } = require('./claude');
 const desktopLayer = require('./desktop-layer');
+const desktopGrid = require('./desktop-grid');
 
-const WIDGET_WIDTH = 320;
-const DEFAULT_HEIGHT = 260;
-const EDGE_MARGIN = 16;
+// Transparent margin around the panel inside the widget window. Must match --tile-inset in styles.css.
+const TILE_INSET = 4;
+const DEFAULT_CONTENT_HEIGHT = 300;
 const REFRESH_CHOICES = [1, 2, 5, 10, 15, 30];
 const REPO_URL = 'https://github.com/ayushvjain/usage-meter-for-claude';
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
+const RENDERER = path.join(__dirname, '..', 'renderer');
 
 const client = new ClaudeClient();
 let settings = null;
 let widget = null;
+let settingsWin = null;
 let desktopPin = null;
 let tray = null;
 let scheduler = null;
-let state = { status: 'loading', limits: [], fetchedAt: null, nextRefreshAt: null, message: null, org: null, orgCount: 0, orgChoices: [] };
+let quitting = false;
+let cell = null;
+let contentHeight = DEFAULT_CONTENT_HEIGHT;
 let knownOrgs = [];
+let state = {
+  status: 'loading',
+  limits: [],
+  fetchedAt: null,
+  nextRefreshAt: null,
+  message: null,
+  org: null,
+  orgCount: 0,
+  orgChoices: [],
+  signInPending: false,
+};
 
 /* ---------- State ---------- */
 
@@ -32,6 +48,43 @@ function publicSettings() {
     warnAt: settings.warnAt,
     dangerAt: settings.dangerAt,
     refreshMinutes: settings.refreshMinutes,
+    theme: settings.theme,
+    accent: settings.accent,
+    opacity: settings.opacity,
+  };
+}
+
+/** Everything the Settings window shows. */
+function settingsSnapshot() {
+  return {
+    settings: {
+      refreshMinutes: settings.refreshMinutes,
+      showPeakHours: settings.showPeakHours,
+      startWithWindows: settings.startWithWindows,
+      theme: settings.theme,
+      accent: settings.accent,
+      opacity: settings.opacity,
+      widgetSize: settings.widgetSize,
+    },
+    account: {
+      status: state.status,
+      signInPending: state.signInPending,
+      org: state.org,
+      chosenOrgId: settings.orgId,
+      orgs: knownOrgs.map((o) => ({ uuid: o.uuid, name: o.name })),
+    },
+    options: {
+      refreshChoices: REFRESH_CHOICES,
+      accents: ACCENTS,
+      sizes: Object.keys(WIDGET_SIZES),
+      opacity: OPACITY_RANGE,
+    },
+    app: {
+      version: app.getVersion(),
+      storeBuild: Boolean(process.windowsStore),
+      repoUrl: REPO_URL,
+      grid: cell ? { w: cell.w, h: cell.h, source: cell.source } : null,
+    },
   };
 }
 
@@ -39,25 +92,39 @@ function sendState() {
   if (widget && !widget.isDestroyed()) widget.webContents.send('state', { ...state, settings: publicSettings() });
 }
 
+function sendSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('settings', settingsSnapshot());
+}
+
 function setState(patch) {
   const wasAuth = state.status === 'auth';
   state = { ...state, ...patch };
   sendState();
+  sendSettings();
   if (tray && wasAuth !== (state.status === 'auth')) tray.setContextMenu(buildMenu());
 }
 
 function updateSetting(key, value) {
   settings = { ...settings, [key]: value };
   config.save(settings);
-  if (tray) tray.setContextMenu(buildMenu());
   sendState();
+  sendSettings();
+}
+
+/** A change made in the Settings window, plus whatever it affects right away. */
+function applySetting(key, value) {
+  const clean = config.cleanEditable(key, value);
+  if (clean === undefined) return;
+  updateSetting(key, clean);
+  if (key === 'refreshMinutes') scheduler.setIntervalMs(clean * 60 * 1000);
+  if (key === 'startWithWindows' && !process.windowsStore) app.setLoginItemSettings({ openAtLogin: clean });
+  if (key === 'widgetSize') layoutWidget();
 }
 
 async function runRefresh() {
   setState({ status: 'loading' });
   try {
     const result = await client.fetchUsage({ pinnedId: settings.orgId });
-    const orgsChanged = result.orgs.map((o) => o.uuid).join() !== knownOrgs.map((o) => o.uuid).join();
     knownOrgs = result.orgs;
     if (result.needsChoice) {
       setState({
@@ -80,7 +147,6 @@ async function runRefresh() {
         orgChoices: [],
       });
     }
-    if (orgsChanged && tray) tray.setContextMenu(buildMenu());
   } catch (err) {
     if (err instanceof AuthError) {
       knownOrgs = [];
@@ -99,7 +165,30 @@ function chooseOrg(uuid) {
   scheduler.refreshNow('organization');
 }
 
-/* ---------- Theme ---------- */
+/* ---------- Account ---------- */
+
+function signIn() {
+  setState({ signInPending: true });
+  client.openWindow({
+    autoClose: true,
+    onSignedIn: () => scheduler.refreshNow('sign-in'),
+    onShown: () => setState({ signInPending: false }),
+    onClosed: () => setState({ signInPending: false }),
+  });
+}
+
+function openClaude() {
+  client.openWindow({ autoClose: false, onSignedIn: () => scheduler.refreshNow('sign-in') });
+}
+
+async function signOut() {
+  await client.signOut();
+  knownOrgs = [];
+  updateSetting('orgId', null);
+  setState({ status: 'auth', limits: [], fetchedAt: null, message: null, org: null, orgCount: 0, orgChoices: [] });
+}
+
+/* ---------- Custom CSS (for developers) ---------- */
 
 function userThemePath() {
   return path.join(app.getPath('userData'), 'theme.css');
@@ -129,25 +218,58 @@ function watchUserTheme() {
   fs.watchFile(userThemePath(), { interval: 1000 }, () => sendTheme());
 }
 
-/* ---------- Widget window ---------- */
+/* ---------- Widget window and desktop grid ---------- */
 
-function pointIsVisible(x, y) {
-  return screen.getAllDisplays().some(({ workArea: a }) => x >= a.x && y >= a.y && x < a.x + a.width && y < a.y + a.height);
+function refreshCell() {
+  cell = desktopGrid.getCell(screen);
 }
 
-function initialPosition() {
-  if (settings.position && pointIsVisible(settings.position.x + 20, settings.position.y + 20)) return settings.position;
-  const { workArea: a } = screen.getPrimaryDisplay();
-  return { x: a.x + a.width - WIDGET_WIDTH - EDGE_MARGIN, y: a.y + a.height - DEFAULT_HEIGHT - EDGE_MARGIN };
+function currentLayout() {
+  return gridLayout({ cell, tilesWide: WIDGET_SIZES[settings.widgetSize], contentHeight, inset: TILE_INSET });
+}
+
+function areaFor(point) {
+  return screen.getDisplayNearestPoint(point).workArea;
+}
+
+/** Where the widget's top-left tile should be for a window of the given size. */
+function tileFor(size) {
+  const saved = settings.position;
+  if (saved) {
+    const area = areaFor({ x: saved.x + 10, y: saved.y + 10 });
+    return snapToGrid({ ...saved, ...size }, area, cell);
+  }
+  return defaultTile(size, screen.getPrimaryDisplay().workArea, cell);
+}
+
+/** Sizes the widget to whole tiles and puts it on the nearest tile. */
+function layoutWidget() {
+  if (!widget || widget.isDestroyed()) return;
+  const { width, height } = currentLayout();
+  const { x, y } = tileFor({ width, height });
+  const b = widget.getBounds();
+  if (b.x !== x || b.y !== y || b.width !== width || b.height !== height) widget.setBounds({ x, y, width, height });
+}
+
+/** After the user drags the widget, snap it to the nearest tile and remember it. */
+function snapAfterMove() {
+  if (!widget || widget.isDestroyed()) return;
+  const b = widget.getBounds();
+  const snapped = snapToGrid(b, areaFor({ x: b.x + b.width / 2, y: b.y + b.height / 2 }), cell);
+  if (snapped.x !== b.x || snapped.y !== b.y) widget.setBounds({ x: snapped.x, y: snapped.y, width: b.width, height: b.height });
+  if (!settings.position || settings.position.x !== snapped.x || settings.position.y !== snapped.y) {
+    updateSetting('position', { x: snapped.x, y: snapped.y });
+  }
 }
 
 function createWidget() {
-  const { x, y } = initialPosition();
+  const { width, height } = currentLayout();
+  const { x, y } = tileFor({ width, height });
   widget = new BrowserWindow({
     x,
     y,
-    width: WIDGET_WIDTH,
-    height: DEFAULT_HEIGHT,
+    width,
+    height,
     frame: false,
     transparent: true,
     resizable: false,
@@ -169,26 +291,26 @@ function createWidget() {
     },
   });
 
-  widget.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  widget.loadFile(path.join(RENDERER, 'index.html'));
   widget.once('ready-to-show', () => {
     widget.showInactive();
     desktopPin = desktopLayer.attach(widget);
   });
 
-  let saveTimer = null;
+  let moveTimer = null;
   widget.on('moved', () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      if (!widget || widget.isDestroyed()) return;
-      const b = widget.getBounds();
-      updateSetting('position', { x: b.x, y: b.y });
-    }, 400);
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(snapAfterMove, 120);
   });
 
   widget.on('closed', () => {
+    clearTimeout(moveTimer);
     if (desktopPin) desktopPin.detach();
     desktopPin = null;
     widget = null;
+    // The widget belongs to the desktop window, so Windows closes it if Explorer restarts.
+    // Bring it back unless the app is quitting.
+    if (!quitting) setTimeout(() => !widget && !quitting && createWidget(), 1500);
   });
 
   // Links inside the widget (if a theme adds any) open in the default browser.
@@ -213,90 +335,60 @@ function toggleWidget() {
   if (tray) tray.setContextMenu(buildMenu());
 }
 
-/* ---------- Tray and menu ---------- */
-
-function signIn() {
-  client.openWindow({ autoClose: true, onSignedIn: () => scheduler.refreshNow('sign-in') });
-}
-
-function organizationMenu() {
-  // Only accounts with more than one claude.ai organization get this menu.
-  if (knownOrgs.length < 2) return [];
-  return [
-    {
-      label: 'Organization',
-      submenu: knownOrgs.map((o) => ({
-        label: o.name,
-        type: 'radio',
-        checked: settings.orgId === o.uuid,
-        click: () => chooseOrg(o.uuid),
-      })),
-    },
-  ];
-}
-
-function buildMenu() {
-  const storeBuild = Boolean(process.windowsStore);
-  return Menu.buildFromTemplate([
-    { label: widget && widget.isVisible() ? 'Hide widget' : 'Show widget', click: toggleWidget },
-    { label: 'Refresh now', click: () => scheduler.refreshNow('manual') },
-    { type: 'separator' },
-    ...organizationMenu(),
-    {
-      label: 'Refresh every',
-      submenu: REFRESH_CHOICES.map((minutes) => ({
-        label: minutes === 1 ? '1 minute' : `${minutes} minutes`,
-        type: 'radio',
-        checked: settings.refreshMinutes === minutes,
-        click: () => {
-          updateSetting('refreshMinutes', clampRefreshMinutes(minutes));
-          scheduler.setIntervalMs(settings.refreshMinutes * 60 * 1000);
-        },
-      })),
-    },
-    {
-      label: 'Show peak hours',
-      type: 'checkbox',
-      checked: settings.showPeakHours,
-      click: (item) => updateSetting('showPeakHours', item.checked),
-    },
-    {
-      // Store (MSIX) builds manage startup through Windows Settings > Apps > Startup instead.
-      label: storeBuild ? 'Start with Windows (set in Windows Settings)' : 'Start with Windows',
-      type: 'checkbox',
-      enabled: !storeBuild,
-      checked: settings.startWithWindows,
-      click: (item) => {
-        updateSetting('startWithWindows', item.checked);
-        app.setLoginItemSettings({ openAtLogin: item.checked });
-      },
-    },
-    { type: 'separator' },
-    { label: 'Edit theme…', click: () => shell.openPath(userThemePath()) },
-    { label: 'Reset widget position', click: resetPosition },
-    { type: 'separator' },
-    { label: 'Open claude.ai', click: () => client.openWindow({ autoClose: false, onSignedIn: () => scheduler.refreshNow('sign-in') }) },
-    state.status === 'auth' ? { label: 'Sign in…', click: signIn } : { label: 'Sign out', click: signOut },
-    { label: 'About and source code', click: () => shell.openExternal(REPO_URL) },
-    { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
-  ]);
-}
-
 function resetPosition() {
   updateSetting('position', null);
-  if (!widget) return;
-  const { workArea: a } = screen.getPrimaryDisplay();
-  const b = widget.getBounds();
-  widget.setBounds({ x: a.x + a.width - WIDGET_WIDTH - EDGE_MARGIN, y: a.y + a.height - b.height - EDGE_MARGIN, width: WIDGET_WIDTH, height: b.height });
+  layoutWidget();
 }
 
-async function signOut() {
-  await client.signOut();
-  knownOrgs = [];
-  updateSetting('orgId', null);
-  setState({ status: 'auth', limits: [], fetchedAt: null, message: null, org: null, orgCount: 0, orgChoices: [] });
-  if (tray) tray.setContextMenu(buildMenu());
+/* ---------- Settings window ---------- */
+
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) {
+    settingsWin.show();
+    settingsWin.focus();
+    return;
+  }
+  settingsWin = new BrowserWindow({
+    width: 560,
+    height: 640,
+    resizable: false,
+    maximizable: false,
+    minimizable: true,
+    fullscreenable: false,
+    autoHideMenuBar: true,
+    title: 'Settings · Usage Meter for Claude',
+    icon: path.join(ASSETS, 'icon.png'),
+    show: false,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#131b29' : '#f4f6fa',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  settingsWin.loadFile(path.join(RENDERER, 'settings.html'));
+  settingsWin.once('ready-to-show', () => settingsWin.show());
+  settingsWin.on('closed', () => {
+    settingsWin = null;
+  });
+  settingsWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+}
+
+/* ---------- Tray and menu ---------- */
+
+function buildMenu() {
+  return Menu.buildFromTemplate([
+    { label: 'Refresh now', click: () => scheduler.refreshNow('manual') },
+    { label: 'Settings…', click: openSettings },
+    ...(state.status === 'auth' ? [{ label: 'Sign in…', click: signIn }] : []),
+    { type: 'separator' },
+    { label: widget && widget.isVisible() ? 'Hide widget' : 'Show widget', click: toggleWidget },
+    { label: 'Quit', click: () => app.quit() },
+  ]);
 }
 
 function createTray() {
@@ -309,10 +401,25 @@ function createTray() {
 
 /* ---------- IPC ---------- */
 
+const ACTIONS = {
+  'open-theme-file': () => shell.openPath(userThemePath()),
+  'reset-position': resetPosition,
+  'open-repo': () => shell.openExternal(REPO_URL),
+  'open-claude': openClaude,
+  'open-settings': openSettings,
+};
+
 function registerIpc() {
   ipcMain.handle('usage:refresh', () => scheduler.refreshNow('manual'));
   ipcMain.handle('auth:sign-in', () => signIn());
+  ipcMain.handle('auth:sign-out', () => signOut());
   ipcMain.handle('org:choose', (_event, uuid) => chooseOrg(String(uuid)));
+  ipcMain.handle('settings:get', () => settingsSnapshot());
+  ipcMain.handle('settings:set', (_event, key, value) => applySetting(String(key), value));
+  ipcMain.handle('app:action', (_event, name) => {
+    const action = ACTIONS[String(name)];
+    if (action) action();
+  });
 
   ipcMain.on('widget:ready', () => {
     sendTheme();
@@ -323,17 +430,12 @@ function registerIpc() {
     if (widget) buildMenu().popup({ window: widget });
   });
 
+  // The widget reports how tall its content is; the window becomes that many whole tiles.
   ipcMain.on('widget:resize', (_event, requested) => {
-    if (!widget || widget.isDestroyed()) return;
-    const height = Math.max(80, Math.min(900, Math.round(Number(requested) || DEFAULT_HEIGHT)));
-    const b = widget.getBounds();
-    if (b.height === height) return;
-    const { workArea: a } = screen.getDisplayMatching(b);
-    const wasTouchingBottom = b.y + b.height >= a.y + a.height - EDGE_MARGIN - 2;
-    let y = b.y;
-    // Keep a widget docked near the bottom edge anchored there as it grows or shrinks.
-    if (wasTouchingBottom || y + height > a.y + a.height) y = Math.max(a.y, a.y + a.height - height - EDGE_MARGIN);
-    widget.setBounds({ x: b.x, y, width: WIDGET_WIDTH, height });
+    const h = Math.round(Number(requested));
+    if (!Number.isFinite(h) || h <= 0 || h > 2000 || h === contentHeight) return;
+    contentHeight = h;
+    layoutWidget();
   });
 }
 
@@ -341,6 +443,7 @@ function registerIpc() {
 
 async function start() {
   settings = config.load();
+  refreshCell();
   ensureUserTheme();
   client.init();
   registerIpc();
@@ -348,15 +451,21 @@ async function start() {
   createTray();
   watchUserTheme();
 
+  // The icon grid changes with display scaling, resolution and desktop icon size.
+  const onDisplayChange = () => {
+    refreshCell();
+    layoutWidget();
+  };
+  screen.on('display-metrics-changed', onDisplayChange);
+  screen.on('display-added', onDisplayChange);
+  screen.on('display-removed', onDisplayChange);
+
   if (!process.windowsStore && settings.startWithWindows) app.setLoginItemSettings({ openAtLogin: true });
 
   scheduler = new RefreshScheduler({
     intervalMs: settings.refreshMinutes * 60 * 1000,
     task: runRefresh,
-    onScheduled: (nextAt) => {
-      setState({ nextRefreshAt: nextAt });
-      if (tray) tray.setContextMenu(buildMenu());
-    },
+    onScheduled: (nextAt) => setState({ nextRefreshAt: nextAt }),
   });
   scheduler.start();
 }
@@ -369,6 +478,7 @@ if (!app.requestSingleInstanceLock()) {
   // Keep running in the tray when every window is closed.
   app.on('window-all-closed', () => {});
   app.on('before-quit', () => {
+    quitting = true;
     if (scheduler) scheduler.stop();
     fs.unwatchFile(userThemePath());
   });

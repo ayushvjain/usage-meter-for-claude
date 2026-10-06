@@ -1,8 +1,9 @@
 /*
-  Your theme for Usage Meter for Claude.
+  Custom CSS for Usage Meter for Claude (for developers).
 
-  This file is loaded after the built-in styles, so anything here wins.
-  Save the file and the widget updates within a second. No restart needed.
+  Theme, accent colour, opacity and size are easier to change in Settings. This file is
+  for everything else. It loads after the built-in styles and the Settings choices, so
+  anything here wins. Save the file and the widget updates within a second.
 
   Start by uncommenting a variable below and changing its value.
   To go back to the default look, delete everything in this file.
@@ -10,9 +11,9 @@
 
 :root {
   /* Panel */
-  /* --bg: rgba(19, 27, 41, 0.9); */
+  /* --bg: rgba(19, 27, 41, 0.9);   overrides the theme and the opacity setting */
   /* --border: rgba(255, 255, 255, 0.08); */
-  /* --radius: 16px; */
+  /* --radius: 14px; */
   /* --pad: 16px; */
 
   /* Text */

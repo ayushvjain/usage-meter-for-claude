@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    />
+    <title>Settings · Usage Meter for Claude</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        <p class="nav-title">Settings</p>
+        <button class="nav-item" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true" type="button">General</button>
+        <button class="nav-item" role="tab" id="tab-appearance" aria-controls="panel-appearance" aria-selected="false" tabindex="-1" type="button">Appearance</button>
+        <button class="nav-item" role="tab" id="tab-account" aria-controls="panel-account" aria-selected="false" tabindex="-1" type="button">Account</button>
+        <button class="nav-item" role="tab" id="tab-about" aria-controls="panel-about" aria-selected="false" tabindex="-1" type="button">About</button>
+      </nav>
+
+      <main class="panels">
+        <!-- General -->
+        <section class="panel" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+          <h1>General</h1>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="refresh-minutes">Refresh every</label>
+              <p>How often the widget checks your usage. Refreshing by hand restarts the countdown.</p>
+            </div>
+            <select id="refresh-minutes"></select>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="show-peak">Show peak hours</label>
+              <p>Weekdays 13:00 to 19:00 UTC, shown in your local time.</p>
+            </div>
+            <input class="switch" type="checkbox" role="switch" id="show-peak" />
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="start-with-windows">Start with Windows</label>
+              <p id="start-note">Open the widget when you sign in to Windows.</p>
+            </div>
+            <input class="switch" type="checkbox" role="switch" id="start-with-windows" />
+          </div>
+        </section>
+
+        <!-- Appearance -->
+        <section class="panel" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance" hidden>
+          <h1>Appearance</h1>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="theme-label">Theme</span>
+              <p>System follows Windows' light or dark mode.</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="theme-label" id="theme">
+              <button type="button" role="radio" data-value="system">System</button>
+              <button type="button" role="radio" data-value="dark">Dark</button>
+              <button type="button" role="radio" data-value="light">Light</button>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="accent-label">Accent colour</span>
+              <p>Used for the usage bars and buttons. Bars still turn amber and red as you near a limit.</p>
+            </div>
+            <div class="swatches" role="radiogroup" aria-labelledby="accent-label" id="accent"></div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <label for="opacity">Background opacity</label>
+              <p>Lower values let more of your wallpaper show through.</p>
+            </div>
+            <div class="range">
+              <input type="range" id="opacity" />
+              <output id="opacity-value" for="opacity"></output>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="size-label">Widget size</span>
+              <p>The widget snaps to your desktop icon grid like a large icon: 3, 4 or 5 icon tiles wide. Drag it by its title.</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="size-label" id="widget-size">
+              <button type="button" role="radio" data-value="small">Small</button>
+              <button type="button" role="radio" data-value="medium">Medium</button>
+              <button type="button" role="radio" data-value="large">Large</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <span class="label">Position</span>
+              <p>Move the widget back to the top-left corner of your main screen.</p>
+            </div>
+            <button class="btn" type="button" data-action="reset-position">Reset position</button>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <span class="label">Custom CSS</span>
+              <p>For developers: restyle anything with your own CSS file. Changes apply when you save it.</p>
+            </div>
+            <button class="btn" type="button" data-action="open-theme-file">Open CSS file</button>
+          </div>
+        </section>
+
+        <!-- Account -->
+        <section class="panel" role="tabpanel" id="panel-account" aria-labelledby="tab-account" hidden>
+          <h1>Account</h1>
+
+          <div class="card" id="account-card">
+            <span class="status-dot" id="account-dot" aria-hidden="true"></span>
+            <div class="card-text">
+              <p class="card-title" id="account-title"></p>
+              <p class="card-sub" id="account-sub"></p>
+            </div>
+            <button class="btn btn--primary" type="button" id="sign-in">Sign in</button>
+            <button class="btn" type="button" id="sign-out" hidden>Sign out</button>
+          </div>
+
+          <div class="row row--stack" id="org-row" hidden>
+            <div class="row-text">
+              <label for="org">Organization</label>
+              <p>Your account belongs to more than one. The widget shows the one you pick.</p>
+            </div>
+            <select id="org"></select>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <span class="label">claude.ai</span>
+              <p>Open claude.ai in the widget's own browser window, for example to pass a browser check.</p>
+            </div>
+            <button class="btn" type="button" data-action="open-claude">Open claude.ai</button>
+          </div>
+
+          <p class="fine-print">
+            Your sign-in stays on this computer, in the widget's own browser profile. The widget only talks to claude.ai.
+            Signing out deletes it.
+          </p>
+        </section>
+
+        <!-- About -->
+        <section class="panel" role="tabpanel" id="panel-about" aria-labelledby="tab-about" hidden>
+          <h1>About</h1>
+
+          <div class="about">
+            <img class="about-icon" src="../../assets/icon.png" alt="" width="56" height="56" />
+            <div>
+              <p class="about-name">Usage Meter for Claude</p>
+              <p class="card-sub" id="version"></p>
+            </div>
+          </div>
+
+          <p>A free, open-source desktop widget that shows your Claude session and weekly usage, reset times, and peak hours.</p>
+          <p class="fine-print">Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthropic.</p>
+
+          <div class="row">
+            <div class="row-text">
+              <span class="label">Source code</span>
+              <p>Report a problem, suggest a feature, or contribute on GitHub.</p>
+            </div>
+            <button class="btn" type="button" data-action="open-repo">Open GitHub</button>
+          </div>
+
+          <p class="fine-print" id="grid-info"></p>
+        </section>
+      </main>
+    </div>
+
+    <script src="settings.js"></script>
+  </body>
+</html>

@@ -21,6 +21,8 @@
     next: $('next'),
     refresh: $('refresh'),
     menu: $('menu'),
+    content: $('content'),
+    footer: $('footer'),
     orgName: $('org-name'),
     orgPicker: $('org-picker'),
     orgList: $('org-list'),
@@ -108,14 +110,28 @@
     }
   }
 
+  /** Theme, accent and opacity from Settings. Custom CSS can still override any of it. */
+  function applyAppearance(settings) {
+    const root = document.documentElement;
+    if (!settings || settings.theme === 'system' || !settings.theme) delete root.dataset.theme;
+    else root.dataset.theme = settings.theme;
+    if (settings && settings.accent && settings.accent !== 'teal') root.dataset.accent = settings.accent;
+    else delete root.dataset.accent;
+    const opacity = settings && Number(settings.opacity);
+    if (Number.isFinite(opacity)) root.style.setProperty('--bg-alpha', String(opacity / 100));
+  }
+
   function render() {
     if (!state) return;
+    applyAppearance(state.settings);
     els.widget.dataset.status = state.status;
     els.refresh.disabled = state.status === 'loading';
 
     const needsSignIn = state.status === 'auth';
     const needsOrg = state.status === 'choose-org';
     els.signin.hidden = !needsSignIn;
+    els.signinBtn.disabled = Boolean(state.signInPending);
+    els.signinBtn.textContent = state.signInPending ? 'Opening sign-in…' : 'Sign in';
     els.orgPicker.hidden = !needsOrg;
     els.limits.hidden = needsSignIn || needsOrg;
     if (needsOrg) renderOrgChoices();
@@ -215,10 +231,19 @@
 
   /* ---------- Window sizing ---------- */
 
-  const resizeObserver = new ResizeObserver(() => {
-    meter.resize(Math.ceil(els.widget.getBoundingClientRect().height));
-  });
-  resizeObserver.observe(els.widget);
+  // Reports how tall the panel needs to be. The main process rounds that up to whole
+  // desktop tiles, and the panel stretches to fill them with the footer at the bottom.
+  function reportHeight() {
+    const style = getComputedStyle(els.widget);
+    const px = (name) => parseFloat(style[name]) || 0;
+    const chrome = px('paddingTop') + px('paddingBottom') + px('borderTopWidth') + px('borderBottomWidth');
+    const gap = parseFloat(style.rowGap) || 0;
+    meter.resize(Math.ceil(els.content.offsetHeight + gap + els.footer.offsetHeight + chrome));
+  }
+
+  const resizeObserver = new ResizeObserver(reportHeight);
+  resizeObserver.observe(els.content);
+  resizeObserver.observe(els.footer);
 
   /* ---------- Wiring ---------- */
 
