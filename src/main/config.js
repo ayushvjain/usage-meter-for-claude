@@ -3,37 +3,39 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
-const { clampRefreshMinutes, DEFAULT_REFRESH_MINUTES, THEMES, ACCENTS, OPACITY_RANGE, WIDGET_SIZES } = require('../shared/core');
+const { clampRefreshMinutes, DEFAULT_REFRESH_MINUTES, STYLES, THEMES, ACCENTS, OPACITY_RANGE, clampScale } = require('../shared/core');
 
 const DEFAULTS = Object.freeze({
   refreshMinutes: DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
   startWithWindows: false,
+  style: 'cozy', // cozy (warm colours, serif numbers) or classic
   theme: 'system', // system, dark or light
-  accent: 'teal', // bar and button colour
+  accent: 'clay', // bar and button colour
   opacity: 90, // panel background opacity in percent
-  widgetSize: 'medium', // small, medium or large: 3, 4 or 5 icon tiles wide
+  scale: 1, // widget size: 1 is 100%; dragging the corner or Settings changes it
   warnAt: 60,
   dangerAt: 85,
   position: null, // { x, y } of the widget's top-left tile once placed
   orgId: null, // organization the user picked when the account has several
 });
 
-// Settings from older versions that no longer exist.
-const RETIRED = ['alwaysOnTop'];
+// Settings from older versions that no longer exist. The widget now sizes itself.
+const RETIRED = ['alwaysOnTop', 'widgetSize'];
 
 // Settings the Settings window may change, with how to clean each value.
 const EDITABLE = {
   refreshMinutes: (v) => clampRefreshMinutes(v),
   showPeakHours: (v) => Boolean(v),
   startWithWindows: (v) => Boolean(v),
+  style: (v) => (STYLES.includes(v) ? v : DEFAULTS.style),
   theme: (v) => (THEMES.includes(v) ? v : DEFAULTS.theme),
   accent: (v) => (ACCENTS.includes(v) ? v : DEFAULTS.accent),
+  scale: (v) => clampScale(v),
   opacity: (v) => {
     const n = Math.round(Number(v));
     return Number.isFinite(n) ? Math.min(OPACITY_RANGE.max, Math.max(OPACITY_RANGE.min, n)) : DEFAULTS.opacity;
   },
-  widgetSize: (v) => (Object.prototype.hasOwnProperty.call(WIDGET_SIZES, v) ? v : DEFAULTS.widgetSize),
 };
 
 function configPath() {

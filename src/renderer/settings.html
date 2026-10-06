@@ -55,6 +55,17 @@
 
           <div class="row row--stack">
             <div class="row-text">
+              <span class="label" id="style-label">Style</span>
+              <p>Cozy uses warm colours and serif numbers. Classic is the original cool look.</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="style-label" id="style">
+              <button type="button" role="radio" data-value="cozy">Cozy</button>
+              <button type="button" role="radio" data-value="classic">Classic</button>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
               <span class="label" id="theme-label">Theme</span>
               <p>System follows Windows' light or dark mode.</p>
             </div>
@@ -84,15 +95,16 @@
             </div>
           </div>
 
+
           <div class="row row--stack">
             <div class="row-text">
-              <span class="label" id="size-label">Widget size</span>
-              <p>The widget snaps to your desktop icon grid like a large icon: 3, 4 or 5 icon tiles wide. Drag it by its title.</p>
+              <label for="scale">Size</label>
+              <p>Make the widget bigger for large screens. You can also drag its bottom-right corner, and double-click the corner to go back to 100%.</p>
             </div>
-            <div class="segmented" role="radiogroup" aria-labelledby="size-label" id="widget-size">
-              <button type="button" role="radio" data-value="small">Small</button>
-              <button type="button" role="radio" data-value="medium">Medium</button>
-              <button type="button" role="radio" data-value="large">Large</button>
+            <div class="range">
+              <input type="range" id="scale" />
+              <output id="scale-value" for="scale"></output>
+              <button class="btn" type="button" id="scale-reset">Reset</button>
             </div>
           </div>
 

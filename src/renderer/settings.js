@@ -4,8 +4,8 @@
   const meter = window.meter;
   const $ = (id) => document.getElementById(id);
 
-  const ACCENT_COLOURS = { teal: '#56c6b0', blue: '#6aa8ff', violet: '#a796f5', amber: '#f2b544', rose: '#f48fb1' };
-  const ACCENT_NAMES = { teal: 'Teal', blue: 'Blue', violet: 'Violet', amber: 'Amber', rose: 'Rose' };
+  const ACCENT_COLOURS = { clay: '#e3895f', teal: '#56c6b0', blue: '#6aa8ff', violet: '#a796f5', amber: '#f2b544', rose: '#f48fb1' };
+  const ACCENT_NAMES = { clay: 'Clay', teal: 'Teal', blue: 'Blue', violet: 'Violet', amber: 'Amber', rose: 'Rose' };
 
   let snapshot = null;
   let built = false;
@@ -68,8 +68,8 @@
     const root = document.documentElement;
     if (settings.theme === 'system') delete root.dataset.theme;
     else root.dataset.theme = settings.theme;
-    if (settings.accent === 'teal') delete root.dataset.accent;
-    else root.dataset.accent = settings.accent;
+    root.dataset.accent = settings.accent;
+    root.dataset.style = settings.style;
   }
 
   /* ---------- Build controls once ---------- */
@@ -87,8 +87,8 @@
     $('show-peak').addEventListener('change', (e) => meter.setSetting('showPeakHours', e.target.checked));
     $('start-with-windows').addEventListener('change', (e) => meter.setSetting('startWithWindows', e.target.checked));
 
+    bindRadioGroup($('style'), 'style');
     bindRadioGroup($('theme'), 'theme');
-    bindRadioGroup($('widget-size'), 'widgetSize');
 
     const accent = $('accent');
     s.options.accents.forEach((name) => {
@@ -111,9 +111,24 @@
     let opacityTimer = null;
     opacity.addEventListener('input', () => {
       $('opacity-value').value = `${opacity.value}%`;
+    const scale = $('scale');
+    if (document.activeElement !== scale) scale.value = String(Math.round(st.scale * 100));
+    $('scale-value').value = `${scale.value}%`;
       clearTimeout(opacityTimer);
       opacityTimer = setTimeout(() => meter.setSetting('opacity', Number(opacity.value)), 120);
     });
+
+    const scale = $('scale');
+    scale.min = String(Math.round(s.options.scale.min * 100));
+    scale.max = String(Math.round(s.options.scale.max * 100));
+    scale.step = String(Math.round(s.options.scale.step * 100));
+    let scaleTimer = null;
+    scale.addEventListener('input', () => {
+      $('scale-value').value = `${scale.value}%`;
+      clearTimeout(scaleTimer);
+      scaleTimer = setTimeout(() => meter.setSetting('scale', Number(scale.value) / 100), 120);
+    });
+    $('scale-reset').addEventListener('click', () => meter.setSetting('scale', 1));
 
     $('org').addEventListener('change', (e) => meter.chooseOrg(e.target.value));
     $('sign-in').addEventListener('click', () => meter.signIn());
@@ -190,9 +205,9 @@
     $('start-label').textContent = login.label;
     $('start-note').textContent = login.managedElsewhere ? login.managedNote : login.note;
 
+    setChecked($('style'), st.style);
     setChecked($('theme'), st.theme);
     setChecked($('accent'), st.accent);
-    setChecked($('widget-size'), st.widgetSize);
     const opacity = $('opacity');
     if (document.activeElement !== opacity) opacity.value = String(st.opacity);
     $('opacity-value').value = `${opacity.value}%`;
