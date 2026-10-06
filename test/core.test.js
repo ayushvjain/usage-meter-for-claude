@@ -408,6 +408,34 @@ test('grid: a new widget starts in the top-left tile', () => {
   assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, right, CELL), { x: 1920, y: 0, col: 0, row: 0 }, 'top-left of that screen');
 });
 
+/* ---------- Platforms: every OS implements the same interface ---------- */
+
+const PLATFORM_DIR = path.join(__dirname, '..', 'src', 'main', 'platform');
+const PLATFORMS = fs
+  .readdirSync(PLATFORM_DIR, { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .map((e) => e.name);
+
+test('platforms: the Windows and fallback implementations exist', () => {
+  assert.ok(PLATFORMS.includes('windows'));
+  assert.ok(PLATFORMS.includes('fallback'));
+});
+
+for (const name of PLATFORMS) {
+  test(`platforms: ${name} implements the interface`, () => {
+    const p = require(path.join(PLATFORM_DIR, name));
+    assert.equal(typeof p.name, 'string');
+    for (const fn of ['widgetWindowOptions', 'pinToDesktop', 'getCell', 'prepareApp', 'trayIcon']) {
+      assert.equal(typeof p[fn], 'function', `${name}.${fn}`);
+    }
+    assert.equal(typeof p.widgetWindowOptions(), 'object');
+    assert.match(p.trayIcon('/assets'), /\.png$/);
+    for (const key of ['label', 'note', 'managedElsewhere', 'managedNote']) {
+      assert.ok(key in p.loginItem, `${name}.loginItem.${key}`);
+    }
+  });
+}
+
 /* ---------- Every source file parses ---------- */
 
 test('all JavaScript files are syntactically valid', () => {

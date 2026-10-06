@@ -6,8 +6,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage, nat
 const { RefreshScheduler, parseUsage, gridLayout, snapToGrid, defaultTile, WIDGET_SIZES, ACCENTS, OPACITY_RANGE } = require('../shared/core');
 const config = require('./config');
 const { ClaudeClient, AuthError, NoPlanError } = require('./claude');
-const desktopLayer = require('./desktop-layer');
-const desktopGrid = require('./desktop-grid');
+const platform = require('./platform');
 
 // Transparent margin around the panel inside the widget window. Must match --tile-inset in styles.css.
 const TILE_INSET = 4;
@@ -81,7 +80,8 @@ function settingsSnapshot() {
     },
     app: {
       version: app.getVersion(),
-      storeBuild: Boolean(process.windowsStore),
+      platform: platform.name,
+      loginItem: platform.loginItem,
       repoUrl: REPO_URL,
       grid: cell ? { w: cell.w, h: cell.h, source: cell.source } : null,
     },
@@ -117,7 +117,7 @@ function applySetting(key, value) {
   if (clean === undefined) return;
   updateSetting(key, clean);
   if (key === 'refreshMinutes') scheduler.setIntervalMs(clean * 60 * 1000);
-  if (key === 'startWithWindows' && !process.windowsStore) app.setLoginItemSettings({ openAtLogin: clean });
+  if (key === 'startWithWindows' && !platform.loginItem.managedElsewhere) app.setLoginItemSettings({ openAtLogin: clean });
   if (key === 'widgetSize') layoutWidget();
 }
 
@@ -221,7 +221,7 @@ function watchUserTheme() {
 /* ---------- Widget window and desktop grid ---------- */
 
 function refreshCell() {
-  cell = desktopGrid.getCell(screen);
+  cell = platform.getCell(screen);
 }
 
 function currentLayout() {
@@ -276,11 +276,9 @@ function createWidget() {
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
-    skipTaskbar: true,
-    // "toolbar" makes it a tool window: no taskbar button and not listed in Alt+Tab.
-    type: 'toolbar',
-    // A desktop widget sits below app windows; desktop-layer.js keeps it there.
+    // A desktop widget sits below app windows; the platform module keeps it there.
     alwaysOnTop: false,
+    ...platform.widgetWindowOptions(),
     show: false,
     title: 'Usage Meter for Claude',
     webPreferences: {
@@ -294,7 +292,7 @@ function createWidget() {
   widget.loadFile(path.join(RENDERER, 'index.html'));
   widget.once('ready-to-show', () => {
     widget.showInactive();
-    desktopPin = desktopLayer.attach(widget);
+    desktopPin = platform.pinToDesktop(widget);
   });
 
   let moveTimer = null;
@@ -392,7 +390,7 @@ function buildMenu() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(ASSETS, 'tray.png'));
+  const icon = nativeImage.createFromPath(platform.trayIcon(ASSETS));
   tray = new Tray(icon);
   tray.setToolTip('Usage Meter for Claude');
   tray.setContextMenu(buildMenu());
@@ -442,6 +440,7 @@ function registerIpc() {
 /* ---------- App lifecycle ---------- */
 
 async function start() {
+  platform.prepareApp({ app, Menu });
   settings = config.load();
   refreshCell();
   ensureUserTheme();
@@ -460,7 +459,7 @@ async function start() {
   screen.on('display-added', onDisplayChange);
   screen.on('display-removed', onDisplayChange);
 
-  if (!process.windowsStore && settings.startWithWindows) app.setLoginItemSettings({ openAtLogin: true });
+  if (!platform.loginItem.managedElsewhere && settings.startWithWindows) app.setLoginItemSettings({ openAtLogin: true });
 
   scheduler = new RefreshScheduler({
     intervalMs: settings.refreshMinutes * 60 * 1000,

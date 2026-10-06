@@ -182,12 +182,13 @@
     $('refresh-minutes').value = String(st.refreshMinutes);
     $('show-peak').checked = st.showPeakHours;
 
+    // The wording and availability come from the platform (Windows, macOS, ...).
+    const login = s.app.loginItem;
     const start = $('start-with-windows');
     start.checked = st.startWithWindows;
-    start.disabled = s.app.storeBuild;
-    $('start-note').textContent = s.app.storeBuild
-      ? 'For the Microsoft Store version, turn this on in Windows Settings > Apps > Startup.'
-      : 'Open the widget when you sign in to Windows.';
+    start.disabled = login.managedElsewhere;
+    $('start-label').textContent = login.label;
+    $('start-note').textContent = login.managedElsewhere ? login.managedNote : login.note;
 
     setChecked($('theme'), st.theme);
     setChecked($('accent'), st.accent);
