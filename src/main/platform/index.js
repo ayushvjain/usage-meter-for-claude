@@ -4,7 +4,7 @@
  * Everything that differs between operating systems lives behind this one interface, so
  * main.js never checks which OS it is running on:
  *
- *   name                    'windows' or 'other'
+ *   name                    'windows', 'mac' or 'other'
  *   widgetWindowOptions()   extra BrowserWindow options for the widget
  *   pinToDesktop(win)       keep the widget on the desktop, below app windows; returns { detach }
  *   getCell(screen)         size of one desktop icon tile: { w, h, source }
@@ -15,6 +15,7 @@
 
 function load() {
   if (process.platform === 'win32') return require('./windows');
+  if (process.platform === 'darwin') return require('./mac');
   return require('./fallback');
 }
 

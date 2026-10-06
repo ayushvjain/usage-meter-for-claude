@@ -1,7 +1,7 @@
 /* Settings window. Uses the same palette as the widget and follows the chosen theme. */
 
 :root {
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --accent-on-dark: #56c6b0;
   --accent-on-light: #1a9682;
 

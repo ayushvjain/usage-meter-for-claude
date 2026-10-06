@@ -2,7 +2,7 @@
   "name": "usage-meter-for-claude",
   "productName": "Usage Meter for Claude",
   "version": "0.2.0",
-  "description": "A small Windows desktop widget that shows your Claude session and weekly usage, reset countdowns and peak hours.",
+  "description": "A small desktop widget for Windows and macOS that shows your Claude session and weekly usage, reset countdowns and peak hours.",
   "main": "src/main/main.js",
   "author": "Ayush",
   "license": "MIT",
@@ -11,7 +11,8 @@
     "start": "electron .",
     "test": "node --test test/core.test.js",
     "dist": "electron-builder --win nsis",
-    "dist:store": "electron-builder --win appx"
+    "dist:store": "electron-builder --win appx",
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
   "dependencies": {
     "koffi": "^2.9.0"
@@ -57,6 +58,23 @@
       "languages": [
         "en-US"
       ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "LSUIElement": true
+      }
     }
   }
 }
