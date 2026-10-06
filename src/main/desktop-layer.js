@@ -5,20 +5,25 @@
  * window, the way desktop widgets and gadgets behave. App windows cover it; Win+D (Show
  * desktop) reveals it.
  *
- * Electron has no setting for this, so the module calls three Windows functions from
- * user32.dll through koffi (a prebuilt FFI library, nothing to compile):
- *   GetForegroundWindow   which window has focus
- *   GetWindow / GetClassNameW / FindWindowW   read the window stack
- *   SetWindowPos          move the widget in the stack without moving or focusing it
+ * Two things work together:
  *
- * The decision itself lives in planDesktopPlacement (src/shared/core.js) and is unit tested.
+ * 1. The widget is "owned" by the desktop window (Progman). Windows always keeps an owned
+ *    window above its owner, so clicking the desktop can never cover the widget, not even
+ *    for a moment.
+ * 2. When something does lift the widget above apps (clicking it, for example), it is put
+ *    back directly above the desktop. That decision is planDesktopPlacement in
+ *    src/shared/core.js, which is unit tested.
+ *
  * Set USAGE_METER_DEBUG_DESKTOP=1 to log what the module sees.
  */
 
 const { planDesktopPlacement } = require('../shared/core');
+const win32 = require('./win32');
 
-const TICK_MS = 400;
+const TICK_MS = 250;
+const GW_OWNER = 4;
 const GW_HWNDPREV = 3;
+const GWLP_HWNDPARENT = -8;
 const SWP_NOSIZE = 0x0001;
 const SWP_NOMOVE = 0x0002;
 const SWP_NOACTIVATE = 0x0010;
@@ -36,63 +41,43 @@ const NEUTRAL_CLASSES = new Set([
   '#32768',
 ]);
 
-function loadUser32() {
-  if (process.platform !== 'win32') return null;
-  try {
-    const koffi = require('koffi');
-    const user32 = koffi.load('user32.dll');
-    return {
-      GetForegroundWindow: user32.func('intptr_t __stdcall GetForegroundWindow()'),
-      GetWindow: user32.func('intptr_t __stdcall GetWindow(intptr_t hWnd, uint32_t uCmd)'),
-      FindWindowW: user32.func('intptr_t __stdcall FindWindowW(str16 lpClassName, str16 lpWindowName)'),
-      GetClassNameW: user32.func('int __stdcall GetClassNameW(intptr_t hWnd, void *lpClassName, int nMaxCount)'),
-      SetWindowPos: user32.func(
-        'bool __stdcall SetWindowPos(intptr_t hWnd, intptr_t hWndInsertAfter, int X, int Y, int cx, int cy, uint32_t uFlags)',
-      ),
-    };
-  } catch (err) {
-    console.warn('Desktop layer unavailable, the widget will behave like a normal window:', err && err.message);
-    return null;
-  }
-}
-
-function handleOf(win) {
-  const buf = win.getNativeWindowHandle();
-  return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0);
-}
-
 /** Pins `win` to the desktop layer. Returns { supported, detach }. */
 function attach(win) {
-  const api = loadUser32();
+  const api = win32.load();
   if (!api) return { supported: false, detach() {} };
 
   const debug = process.env.USAGE_METER_DEBUG_DESKTOP === '1';
-  const self = handleOf(win);
-  const nameBuf = Buffer.alloc(512);
-  const classOf = (h) => {
-    if (!h) return '';
-    const n = api.GetClassNameW(h, nameBuf, 256);
-    return n > 0 ? nameBuf.toString('utf16le', 0, n * 2) : '';
-  };
+  const self = win32.handleOf(win);
+  const classOf = (h) => win32.classNameOf(api, h);
   const windowAbove = (h) => Number(api.GetWindow(h, GW_HWNDPREV)) || 0;
 
   let lastForeign = 0;
   let lastLog = '';
 
+  function ensureOwnedByDesktop(progman) {
+    if (!progman || !api.SetWindowLongPtrW) return;
+    const owner = Number(api.GetWindow(self, GW_OWNER)) || 0;
+    // Progman changes when Explorer restarts, so this is checked on every tick.
+    if (owner !== progman) api.SetWindowLongPtrW(self, GWLP_HWNDPARENT, progman);
+  }
+
   function tick() {
     if (win.isDestroyed() || !win.isVisible()) return;
     try {
+      const progman = Number(api.FindWindowW('Progman', null)) || 0;
+      ensureOwnedByDesktop(progman);
+
       const fg = Number(api.GetForegroundWindow()) || 0;
       const fgClass = classOf(fg);
       // Clicking the widget, the taskbar or a menu keeps the previous decision.
       if (fg && fg !== self && !NEUTRAL_CLASSES.has(fgClass)) lastForeign = fg;
 
-      const progman = Number(api.FindWindowW('Progman', null)) || 0;
       const plan = planDesktopPlacement({ self, foreground: lastForeign, progman, classOf, windowAbove });
       if (plan.action === 'place') api.SetWindowPos(self, plan.insertAfter, 0, 0, 0, 0, FLAGS);
 
       if (debug) {
-        const line = `foreground=${fgClass || '-'} decidingWindow=${classOf(lastForeign) || '-'} action=${plan.action}`;
+        const owned = (Number(api.GetWindow(self, GW_OWNER)) || 0) === progman;
+        const line = `foreground=${fgClass || '-'} decidingWindow=${classOf(lastForeign) || '-'} ownedByDesktop=${owned} action=${plan.action}`;
         if (line !== lastLog) console.log('[desktop-layer]', line);
         lastLog = line;
       }

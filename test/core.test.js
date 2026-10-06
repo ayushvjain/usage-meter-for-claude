@@ -364,6 +364,50 @@ test('desktop: without a desktop window to anchor to, nothing moves', () => {
   assert.equal(plan.action, 'none');
 });
 
+/* ---------- Desktop grid: the widget snaps like an icon ---------- */
+
+const CELL = { w: 75, h: 90 };
+const AREA = { x: 0, y: 0, width: 1920, height: 1032 }; // 1080p minus the taskbar
+
+test('grid: decodes the desktop icon spacing into device-independent pixels', () => {
+  assert.deepEqual(core.decodeItemSpacing((90 << 16) | 75, 1), { w: 75, h: 90 });
+  assert.deepEqual(core.decodeItemSpacing((135 << 16) | 113, 1.5), { w: 75, h: 90 }, '150% scaling');
+  assert.equal(core.decodeItemSpacing(0, 1), null);
+  assert.equal(core.decodeItemSpacing((5 << 16) | 5, 1), null, 'nonsense values are rejected');
+});
+
+test('grid: the widget is a whole number of tiles', () => {
+  const medium = core.gridLayout({ cell: CELL, tilesWide: core.WIDGET_SIZES.medium, contentHeight: 300, inset: 4 });
+  assert.deepEqual(medium, { width: 300, height: 360, cols: 4, rows: 4 });
+  const exact = core.gridLayout({ cell: CELL, tilesWide: 3, contentHeight: 262, inset: 4 });
+  assert.equal(exact.rows, 3, 'content that fits exactly does not add a tile');
+  assert.equal(core.gridLayout({ cell: CELL, tilesWide: 5, contentHeight: 0, inset: 4 }).rows, 1);
+});
+
+test('grid: a dropped widget snaps to the nearest tile', () => {
+  const snapped = core.snapToGrid({ x: 190, y: 140, width: 300, height: 360 }, AREA, CELL);
+  assert.deepEqual(snapped, { x: 225, y: 180, col: 3, row: 2 });
+});
+
+test('grid: a widget dragged past the edge stays fully on screen', () => {
+  const snapped = core.snapToGrid({ x: 1900, y: 1000, width: 300, height: 360 }, AREA, CELL);
+  assert.ok(snapped.x + 300 <= AREA.width && snapped.y + 360 <= AREA.height);
+  assert.deepEqual(core.snapToGrid({ x: -50, y: -50, width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0, col: 0, row: 0 });
+});
+
+test('grid: tiles are measured from the work area of a second monitor', () => {
+  const right = { x: 1920, y: 0, width: 2560, height: 1392 };
+  const snapped = core.snapToGrid({ x: 2000, y: 100, width: 300, height: 360 }, right, CELL);
+  assert.equal((snapped.x - right.x) % CELL.w, 0);
+  assert.equal((snapped.y - right.y) % CELL.h, 0);
+});
+
+test('grid: a new widget starts in the top-left tile', () => {
+  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0, col: 0, row: 0 });
+  const right = { x: 1920, y: 0, width: 2560, height: 1392 };
+  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, right, CELL), { x: 1920, y: 0, col: 0, row: 0 }, 'top-left of that screen');
+});
+
 /* ---------- Every source file parses ---------- */
 
 test('all JavaScript files are syntactically valid', () => {

@@ -187,11 +187,17 @@ class ClaudeClient {
   /**
    * Opens claude.ai in a normal window. With autoClose, the window closes itself once the
    * user is signed in. onSignedIn runs once, the first time a signed-in session is seen.
+   * onShown runs when the window appears and onClosed when it goes away, so the widget can
+   * say "Opening sign-in…" in the meantime.
+   *
+   * The window stays hidden until claude.ai has drawn its page, instead of showing an
+   * empty black window while the page loads.
    */
-  openWindow({ autoClose = true, onSignedIn } = {}) {
+  openWindow({ autoClose = true, onSignedIn, onShown, onClosed } = {}) {
     if (this.loginWin && !this.loginWin.isDestroyed()) {
       this.loginWin.show();
       this.loginWin.focus();
+      if (onShown) onShown();
       return;
     }
 
@@ -200,9 +206,23 @@ class ClaudeClient {
       height: 760,
       title: 'Sign in to Claude',
       autoHideMenuBar: true,
+      show: false,
+      backgroundColor: '#faf9f5',
       webPreferences: secureWebPreferences(),
     });
     this.loginWin = win;
+
+    let shown = false;
+    const reveal = () => {
+      if (shown || win.isDestroyed()) return;
+      shown = true;
+      win.show();
+      win.focus();
+      if (onShown) onShown();
+    };
+    win.once('ready-to-show', reveal);
+    // If claude.ai is slow to draw, show the window anyway rather than leave the user waiting.
+    const revealTimer = setTimeout(reveal, 6000);
 
     // Sign-in providers (Google, for example) open popups. Keep them in the same session.
     win.webContents.setWindowOpenHandler(() => ({
@@ -236,7 +256,9 @@ class ClaudeClient {
     win.webContents.on('did-finish-load', check);
     win.on('closed', () => {
       clearTimeout(timer);
+      clearTimeout(revealTimer);
       this.loginWin = null;
+      if (onClosed) onClosed();
     });
 
     win.loadURL(autoClose ? `${BASE}/login` : BASE).catch(() => {});

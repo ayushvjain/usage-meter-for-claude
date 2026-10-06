@@ -1,0 +1,423 @@
+/* Settings window. Uses the same palette as the widget and follows the chosen theme. */
+
+:root {
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --accent-on-dark: #56c6b0;
+  --accent-on-light: #1a9682;
+
+  --page: #131b29;
+  --surface: #1a2436;
+  --nav: #0f1622;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e9eef5;
+  --muted: #8e9bb0;
+  --hover: rgba(255, 255, 255, 0.06);
+  --accent: var(--accent-on-dark);
+  --on-accent: #0d1a1c;
+  --danger: #f07178;
+  color-scheme: dark;
+}
+
+:root[data-accent="blue"] { --accent-on-dark: #6aa8ff; --accent-on-light: #2563eb; }
+:root[data-accent="violet"] { --accent-on-dark: #a796f5; --accent-on-light: #6c58d6; }
+:root[data-accent="amber"] { --accent-on-dark: #f2b544; --accent-on-light: #b7790a; }
+:root[data-accent="rose"] { --accent-on-dark: #f48fb1; --accent-on-light: #c2416f; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --page: #f4f6fa;
+    --surface: #ffffff;
+    --nav: #e9edf3;
+    --border: rgba(16, 28, 48, 0.1);
+    --text: #16202e;
+    --muted: #5b6980;
+    --hover: rgba(16, 28, 48, 0.05);
+    --accent: var(--accent-on-light);
+    --on-accent: #ffffff;
+    --danger: #d2414d;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --page: #f4f6fa;
+  --surface: #ffffff;
+  --nav: #e9edf3;
+  --border: rgba(16, 28, 48, 0.1);
+  --text: #16202e;
+  --muted: #5b6980;
+  --hover: rgba(16, 28, 48, 0.05);
+  --accent: var(--accent-on-light);
+  --on-accent: #ffffff;
+  --danger: #d2414d;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  height: 100%;
+}
+
+/* ---------- Navigation ---------- */
+
+.nav {
+  background: var(--nav);
+  border-right: 1px solid var(--border);
+  padding: 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-title {
+  margin: 0 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.nav-item {
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.nav-item:hover {
+  background: var(--hover);
+}
+
+.nav-item[aria-selected="true"] {
+  background: var(--hover);
+  font-weight: 600;
+}
+
+.nav-item[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* ---------- Panels ---------- */
+
+.panels {
+  overflow-y: auto;
+  padding: 24px 28px 28px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.panel > p {
+  margin: 4px 0 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.row--stack select {
+  width: 100%;
+}
+
+.row-text {
+  min-width: 0;
+}
+
+.row-text label,
+.row-text .label {
+  font-weight: 600;
+  display: block;
+}
+
+.row-text p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fine-print {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 12px 0 0;
+}
+
+/* ---------- Controls ---------- */
+
+select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-width: 150px;
+  cursor: pointer;
+}
+
+.btn {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--hover);
+}
+
+.btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.btn--primary:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+/* Toggle switch built on a checkbox, so it works with the keyboard and screen readers. */
+.switch {
+  appearance: none;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.switch:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+  background: var(--on-accent);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.segmented button {
+  flex: 1;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 8px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented button:hover {
+  background: var(--hover);
+}
+
+.segmented button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.swatches {
+  display: flex;
+  gap: 10px;
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 3px;
+  cursor: pointer;
+  /* The colour fills the inner circle; the border becomes a ring only when selected. */
+  background: var(--swatch) content-box;
+}
+
+.swatch[aria-checked="true"] {
+  border-color: var(--swatch);
+}
+
+.range {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.range output {
+  width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Account and About ---------- */
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  margin-bottom: 4px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+
+.card[data-state="signed-in"] .status-dot {
+  background: var(--accent);
+}
+
+.card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title,
+.card-sub {
+  margin: 0;
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.card-sub {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.about {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.about-icon {
+  border-radius: 12px;
+}
+
+.about-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+  }
+}
