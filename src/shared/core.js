@@ -296,6 +296,61 @@
     return { action: 'place', insertAfter: above || HWND_TOP };
   }
 
+  /* ---------- Desktop grid (snap like icons) ---------- */
+
+  const FALLBACK_CELL = Object.freeze({ w: 75, h: 75 });
+
+  // Widget widths in desktop-icon tiles.
+  const WIDGET_SIZES = Object.freeze({ small: 3, medium: 4, large: 5 });
+
+  /**
+   * Turns the desktop list view's LVM_GETITEMSPACING result (cell width in the low word,
+   * height in the high word, physical pixels) into a cell size in device-independent pixels.
+   */
+  function decodeItemSpacing(lresult, scaleFactor) {
+    const value = Number(lresult);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    const scale = scaleFactor > 0 ? scaleFactor : 1;
+    const w = Math.round((value & 0xffff) / scale);
+    const h = Math.round(((value >>> 16) & 0xffff) / scale);
+    if (w < 32 || h < 32 || w > 400 || h > 400) return null;
+    return { w, h };
+  }
+
+  /**
+   * Window size for the widget: a whole number of tiles wide (from the size setting) and as
+   * many whole tiles tall as the content needs. `inset` is the transparent margin around the
+   * panel inside the window, so neighbouring icons don't touch it.
+   */
+  function gridLayout({ cell, tilesWide, contentHeight, inset }) {
+    const c = cell || FALLBACK_CELL;
+    const cols = Math.max(1, Math.round(tilesWide || WIDGET_SIZES.medium));
+    const rows = Math.max(1, Math.ceil((Math.max(0, contentHeight) + 2 * (inset || 0)) / c.h));
+    return { width: cols * c.w, height: rows * c.h, cols, rows };
+  }
+
+  /** Nearest tile position for a window, kept fully inside the work area. */
+  function snapToGrid({ x, y, width, height }, area, cell) {
+    const c = cell || FALLBACK_CELL;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const maxCol = Math.max(0, Math.floor((area.width - width) / c.w));
+    const maxRow = Math.max(0, Math.floor((area.height - height) / c.h));
+    const col = clamp(Math.round((x - area.x) / c.w), 0, maxCol);
+    const row = clamp(Math.round((y - area.y) / c.h), 0, maxRow);
+    return { x: area.x + col * c.w, y: area.y + row * c.h, col, row };
+  }
+
+  /** The top-left tile of the screen, used when the widget has never been placed or is reset. */
+  function defaultTile({ width, height }, area, cell) {
+    return snapToGrid({ x: area.x, y: area.y, width, height }, area, cell);
+  }
+
+  /* ---------- Appearance ---------- */
+
+  const THEMES = Object.freeze(['system', 'dark', 'light']);
+  const ACCENTS = Object.freeze(['teal', 'blue', 'violet', 'amber', 'rose']);
+  const OPACITY_RANGE = Object.freeze({ min: 60, max: 100 });
+
   /* ---------- Refresh scheduling ---------- */
 
   /**
@@ -379,5 +434,14 @@
     RefreshScheduler,
     HWND_TOP,
     planDesktopPlacement,
+    FALLBACK_CELL,
+    WIDGET_SIZES,
+    decodeItemSpacing,
+    gridLayout,
+    snapToGrid,
+    defaultTile,
+    THEMES,
+    ACCENTS,
+    OPACITY_RANGE,
   };
 });

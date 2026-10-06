@@ -3,31 +3,47 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
-const { clampRefreshMinutes, DEFAULT_REFRESH_MINUTES } = require('../shared/core');
+const { clampRefreshMinutes, DEFAULT_REFRESH_MINUTES, THEMES, ACCENTS, OPACITY_RANGE, WIDGET_SIZES } = require('../shared/core');
 
 const DEFAULTS = Object.freeze({
   refreshMinutes: DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
   startWithWindows: false,
+  theme: 'system', // system, dark or light
+  accent: 'teal', // bar and button colour
+  opacity: 90, // panel background opacity in percent
+  widgetSize: 'medium', // small, medium or large: 3, 4 or 5 icon tiles wide
   warnAt: 60,
   dangerAt: 85,
-  position: null, // { x, y } once the user drags the widget
+  position: null, // { x, y } of the widget's top-left tile once placed
   orgId: null, // organization the user picked when the account has several
 });
+
+// Settings from older versions that no longer exist.
+const RETIRED = ['alwaysOnTop'];
+
+// Settings the Settings window may change, with how to clean each value.
+const EDITABLE = {
+  refreshMinutes: (v) => clampRefreshMinutes(v),
+  showPeakHours: (v) => Boolean(v),
+  startWithWindows: (v) => Boolean(v),
+  theme: (v) => (THEMES.includes(v) ? v : DEFAULTS.theme),
+  accent: (v) => (ACCENTS.includes(v) ? v : DEFAULTS.accent),
+  opacity: (v) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.min(OPACITY_RANGE.max, Math.max(OPACITY_RANGE.min, n)) : DEFAULTS.opacity;
+  },
+  widgetSize: (v) => (Object.prototype.hasOwnProperty.call(WIDGET_SIZES, v) ? v : DEFAULTS.widgetSize),
+};
 
 function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
-// Settings from older versions that no longer exist.
-const RETIRED = ['alwaysOnTop'];
-
 function sanitize(input) {
   const s = { ...DEFAULTS, ...(input && typeof input === 'object' ? input : {}) };
   RETIRED.forEach((key) => delete s[key]);
-  s.refreshMinutes = clampRefreshMinutes(s.refreshMinutes);
-  s.showPeakHours = Boolean(s.showPeakHours);
-  s.startWithWindows = Boolean(s.startWithWindows);
+  for (const [key, clean] of Object.entries(EDITABLE)) s[key] = clean(s[key]);
   s.warnAt = Number.isFinite(Number(s.warnAt)) ? Number(s.warnAt) : DEFAULTS.warnAt;
   s.dangerAt = Number.isFinite(Number(s.dangerAt)) ? Number(s.dangerAt) : DEFAULTS.dangerAt;
   if (typeof s.orgId !== 'string' || !s.orgId) s.orgId = null;
@@ -51,4 +67,9 @@ function save(settings) {
   fs.renameSync(tmp, file);
 }
 
-module.exports = { DEFAULTS, load, save, configPath };
+/** Cleans one value from the Settings window. Returns undefined for keys it may not change. */
+function cleanEditable(key, value) {
+  return Object.prototype.hasOwnProperty.call(EDITABLE, key) ? EDITABLE[key](value) : undefined;
+}
+
+module.exports = { DEFAULTS, load, save, configPath, cleanEditable };
