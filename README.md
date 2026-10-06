@@ -29,21 +29,34 @@ Your claude.ai chats, the Claude desktop app and Claude Code all draw from the s
 
 Download the latest installer from [Releases](../../releases), or get it from the Microsoft Store (once published).
 
-On first launch, click **Sign in** and sign in to claude.ai in the window that opens. The window closes on its own once you're signed in.
+**"Windows protected your PC"?** Windows shows this for new apps whose installer isn't signed yet or hasn't built up a download history. Click **More info**, then **Run anyway**. The Microsoft Store version doesn't show this warning. See [Code signing](#code-signing) for the plan.
+
+On first launch, click **Sign in**. claude.ai opens in its own window once its page has loaded, and the window closes on its own once you're signed in.
 
 It's a desktop widget: it sits on your desktop, above the wallpaper and icons and below every app window. Open windows cover it, just like desktop icons, and pressing **Win+D** (Show desktop) brings it into view. It doesn't appear in the taskbar or in Alt+Tab.
 
-Drag the widget by its title to move it; it remembers where you put it. Click the `⋯` button on the widget, or right-click the tray icon, for the menu. Clicking the tray icon hides or shows the widget.
+Like a large desktop icon, it sits on your desktop icon grid and takes up whole tiles: 3, 4 or 5 tiles wide, and as many tiles tall as it needs. Drag it by its title and it snaps to the nearest tile when you let go. It remembers where you put it.
 
-## Make it yours
+Click the `⋯` button on the widget, or right-click the tray icon, for **Refresh now**, **Settings**, **Hide widget** and **Quit**. Clicking the tray icon hides or shows the widget.
 
-The look is plain CSS. Open the menu and choose **Edit theme…**. That opens your personal `theme.css`, which loads after the built-in styles. Save it and the widget updates within a second.
+## Settings
+
+Open **Settings** from the `⋯` menu or the tray icon. Everything is there, no files to edit:
+
+- **General:** how often to refresh (1 to 30 minutes), whether to show peak hours, and whether to start with Windows.
+- **Appearance:** theme (System, Dark or Light), accent colour, background opacity, widget size (Small, Medium or Large), and resetting the widget's position.
+- **Account:** sign in or out, choose the organization to show if your account has several, and open claude.ai.
+- **About:** version and a link to this repository.
+
+## Custom CSS (for developers)
+
+If you want to change more than Settings offers, choose **Settings > Appearance > Custom CSS > Open CSS file**. That opens your personal `theme.css`, which loads after the built-in styles and your Settings choices. Save it and the widget updates within a second.
 
 Most changes only need a variable:
 
 ```css
 :root {
-  --bg: rgba(30, 20, 45, 0.92);   /* panel background */
+  --bg: rgba(30, 20, 45, 0.92);   /* panel background (overrides theme and opacity) */
   --ok: #7dd3fc;                  /* bar colour under the warning threshold */
   --warn: #fbbf24;                /* bar colour from 60% */
   --danger: #fb7185;              /* bar colour from 85% */
@@ -64,9 +77,7 @@ Most changes only need a variable:
 
 You can also restyle any element, for example `.peak { display: none; }` or `.footer { opacity: 0.6; }`. To go back to the default look, empty the file.
 
-The theme file lives in `%APPDATA%\Usage Meter for Claude\theme.css` (Store builds keep it inside the app's package folder, so use **Edit theme…** to find it). Share themes by sharing that file.
-
-Other settings are stored next to it in `config.json`. The menu covers all of them; if you edit the file by hand, restart the widget. `warnAt` and `dangerAt` set the bar colour thresholds in percent.
+The file lives in `%APPDATA%\Usage Meter for Claude\theme.css` (Store builds keep it inside the app's package folder, so use the Settings button to find it). Share themes by sharing that file. Other settings are stored next to it in `config.json`; `warnAt` and `dangerAt` there set the bar colour thresholds in percent.
 
 ## How it works
 
@@ -99,6 +110,7 @@ All claude.ai logic lives in `src/main/claude.js`, and response parsing lives in
 
 ### Known limits
 
+- The widget lines up with your desktop icons by asking the desktop for its icon spacing. If your icons use auto-arrange with unusual spacing, the grid may be a few pixels off; Settings > About shows the tile size it detected.
 - Staying on the desktop layer uses standard Windows calls (`SetWindowPos` and friends, through the prebuilt [koffi](https://koffi.dev) library) because Electron has no setting for it. If those calls are unavailable, the widget behaves like a normal window instead. To see what it detects, run it with `$env:USAGE_METER_DEBUG_DESKTOP=1; npm start`.
 
 - The endpoint is undocumented and can change without notice. When it does, the widget shows an error instead of wrong numbers.
@@ -122,6 +134,8 @@ src/
   main/
     main.js              app lifecycle, widget window, tray menu, refresh scheduling
     desktop-layer.js     keeps the widget on the desktop, below app windows
+    desktop-grid.js      reads the desktop icon grid so the widget can snap to it
+    win32.js             loads the few Windows functions the two files above use
     claude.js            sign-in window and claude.ai requests
     config.js            settings file
     preload.js           the small API the widget page can call
@@ -130,8 +144,9 @@ src/
     index.html           widget markup
     styles.css           built-in styles (all values are CSS variables)
     renderer.js          rendering and live countdowns
+    settings.html        the Settings window (with settings.css and settings.js)
   shared/
-    core.js              pure logic: peak hours, usage parsing, formatting, refresh scheduler
+    core.js              pure logic: peak hours, usage parsing, grid snapping, desktop placement, refresh scheduler
 test/
   core.test.js           logic tests and a syntax check of every source file
   fixtures/              real claude.ai usage responses used by the tests
@@ -146,6 +161,19 @@ npm run dist         # dist/Usage Meter for Claude Setup <version>.exe, for GitH
 npm run dist:store   # dist/*.appx, for the Microsoft Store
 ```
 
+### Code signing
+
+Windows SmartScreen warns about installers that aren't signed, and about signed installers that haven't been downloaded enough times yet to build a reputation. The options, cheapest first:
+
+| Option | Cost | Removes the warning? |
+| --- | --- | --- |
+| Microsoft Store | Free for individual developers | Yes. The Store signs the package, so Store installs show no warning. |
+| SignPath Foundation | Free for open-source projects that qualify | Gradually. Installers are signed by "SignPath Foundation"; the warning fades as downloads build reputation. |
+| Azure Artifact Signing (formerly Trusted Signing) | About $10 a month; individuals in the US and Canada | Gradually, same as above. |
+| OV certificate from a certificate authority | Roughly $150 to $300 a year | Gradually, same as above. |
+
+The plan for this project: publish to the Microsoft Store for a warning-free install, and apply to SignPath Foundation for the GitHub installer once the project has some history.
+
 ### Publishing to the Microsoft Store
 
 1. Create a Microsoft Partner Center developer account and reserve the app name.
@@ -154,18 +182,19 @@ npm run dist:store   # dist/*.appx, for the Microsoft Store
 4. Store tiles come from `build/appx/`. Replace those PNGs with your own artwork if you like.
 5. In the listing, say clearly that the app is not affiliated with Anthropic.
 
-In Store builds, "Start with Windows" is managed by Windows (Settings > Apps > Startup), so that menu item is disabled there.
+In Store builds, "Start with Windows" is managed by Windows (Settings > Apps > Startup), so that setting is disabled there.
 
 Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/main/main.js` with your GitHub username so **About and source code** opens your repo.
 
 ## Verify a build
 
-1. `npm test` passes (37 tests).
-2. `npm start`, then sign in. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
-3. Open an app window over the widget: it covers the widget. Click a visible part of the widget: it stays behind the app. Press Win+D: the widget is visible. Press Win+D again: the apps cover it again.
-4. Wait a minute and click refresh. The footer jumps back to about "Next refresh in 5:00" instead of continuing the old countdown.
-5. Choose **Edit theme…**, set `--ok: hotpink;` and save. The session bar turns pink within a second.
-6. Choose **Sign out**. The widget asks you to sign in again.
+1. `npm test` passes (43 tests).
+2. `npm start`, then sign in. The sign-in window appears once claude.ai has loaded, with no black screen. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
+3. Drag the widget a little and let go. It snaps to the same grid as your desktop icons.
+4. Click the widget, then click the desktop, then an app. The widget never disappears, not even briefly, and stays behind app windows. Press Win+D: the widget is visible.
+5. Open **Settings**. Change the theme, accent, opacity and size: the widget updates straight away. Switch organization under Account: the widget shows that organization.
+6. Click refresh. The footer jumps back to about "Next refresh in 5:00".
+7. Choose **Sign out** in Settings > Account. The widget asks you to sign in again.
 
 ## Contributing
 
