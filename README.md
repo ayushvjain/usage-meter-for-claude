@@ -1,6 +1,6 @@
 # Usage Meter for Claude
 
-A small Windows desktop widget that shows how much of your Claude plan you have used, when each limit resets, and whether Claude's peak hours are on right now.
+A small desktop widget for Windows (and macOS, in preview) that shows how much of your Claude plan you have used, when each limit resets, and whether Claude's peak hours are on right now.
 
 It works with Free, Pro and Max accounts. The widget shows whichever limits claude.ai reports for your account: the 5-hour session, the weekly limit, and any per-model weekly limits.
 
@@ -38,6 +38,16 @@ It's a desktop widget: it sits on your desktop, above the wallpaper and icons an
 The widget sizes itself to what your account shows: it is exactly as tall as its content and just as wide, so it's a square with the same even spacing on every plan. Accounts with more limits get a bigger square. To make the whole widget bigger, for example on a large monitor, drag its bottom-right corner (double-click the corner to go back to 100%), or use **Settings → Appearance → Size**. Like a desktop icon, it sits on your icon grid: drag it by its title and it snaps to the nearest tile when you let go. It remembers where you put it.
 
 Click the `⋯` button on the widget, or right-click the tray icon, for **Refresh now**, **Settings**, **Hide widget** and **Quit**. Clicking the tray icon hides or shows the widget.
+
+### macOS (preview)
+
+A Mac version is built from the same code. It hasn't been tested on a physical Mac yet: it is built and smoke-tested on GitHub's macOS runners, so treat it as a preview and please [report problems](../../issues).
+
+- Download the `.dmg` for your Mac from [Releases](../../releases): `arm64` for Apple Silicon (M1 and later), `x64` for Intel. Open it and drag the app to Applications.
+- The app isn't signed by Apple yet, so macOS blocks it the first time. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to the message about Usage Meter for Claude. If macOS says the app "is damaged", run `xattr -cr "/Applications/Usage Meter for Claude.app"` in Terminal, then open it again.
+- The widget sits on the desktop above your icons and below your windows, on every Space. Mission Control and Show Desktop leave it in place. It has no Dock icon and isn't in Cmd+Tab; use the menu bar icon instead.
+- It snaps to a 96 × 96 grid. Matching your own Finder grid spacing is planned.
+- **Open at login** in Settings works the same as Start with Windows.
 
 ## Settings
 
@@ -140,6 +150,7 @@ src/
     platform/
       index.js           picks the implementation for the current OS
       windows/           desktop layer, icon grid and Windows API calls
+      mac/               desktop window level, Dock hiding and menu bar icon for macOS
       fallback/          plain-window behaviour for other systems
   renderer/
     index.html           widget markup
@@ -160,7 +171,10 @@ test/
 ```bash
 npm run dist         # dist/Usage Meter for Claude Setup <version>.exe, for GitHub Releases
 npm run dist:store   # dist/*.appx, for the Microsoft Store
+npm run dist:mac     # dist/*.dmg for Apple Silicon and Intel (needs a Mac)
 ```
+
+The `macOS` GitHub Actions workflow builds the Mac app on every pull request that touches the app, launches it on a real Mac runner, checks that it pins itself to the desktop layer, and uploads the `.dmg` files, the app log and a screenshot as a build artifact. When a release is published, it attaches the `.dmg` files to that release.
 
 ### Code signing
 
@@ -172,6 +186,8 @@ Windows SmartScreen warns about installers that aren't signed, and about signed 
 | SignPath Foundation | Free for open-source projects that qualify | Gradually. Installers are signed by "SignPath Foundation"; the warning fades as downloads build reputation. |
 | Azure Artifact Signing (formerly Trusted Signing) | About $10 a month; individuals in the US and Canada | Gradually, same as above. |
 | OV certificate from a certificate authority | Roughly $150 to $300 a year | Gradually, same as above. |
+
+On macOS, the equivalent is Gatekeeper, which blocks unsigned apps until the user approves them in System Settings. Removing that needs an Apple Developer Program membership (paid yearly) to sign and notarize the app.
 
 The plan for this project: publish to the Microsoft Store for a warning-free install, and apply to SignPath Foundation for the GitHub installer once the project has some history.
 
@@ -189,7 +205,7 @@ Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/m
 
 ## Verify a build
 
-1. `npm test` passes (53 tests).
+1. `npm test` passes (54 tests).
 2. `npm start`, then sign in. The sign-in window appears once claude.ai has loaded, with no black screen. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
 3. Drag the widget a little and let go. It snaps to the same grid as your desktop icons.
 4. Click the widget, then click the desktop, then an app. The widget never disappears, not even briefly, and stays behind app windows. Press Win+D: the widget is visible.
