@@ -17,7 +17,7 @@
  * Set USAGE_METER_DEBUG_DESKTOP=1 to log what the module sees.
  */
 
-const { planDesktopPlacement } = require('../shared/core');
+const { planDesktopPlacement } = require('../../../shared/core');
 const win32 = require('./win32');
 
 const TICK_MS = 250;

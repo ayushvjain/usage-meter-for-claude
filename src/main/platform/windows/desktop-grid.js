@@ -10,7 +10,7 @@
  * 3. A sensible default of 75 x 75.
  */
 
-const { decodeItemSpacing, FALLBACK_CELL } = require('../shared/core');
+const { decodeItemSpacing, FALLBACK_CELL } = require('../../../shared/core');
 const win32 = require('./win32');
 
 const LVM_GETITEMSPACING = 0x1000 + 51;

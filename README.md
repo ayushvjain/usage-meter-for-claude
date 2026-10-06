@@ -100,7 +100,7 @@ Many people belong to several organizations, such as a personal plan and a work 
 - API-only organizations (Claude Console accounts) have no session or weekly limits, so they are never listed.
 - If you leave the chosen organization, the widget asks again. Signing out clears the choice.
 
-All claude.ai logic lives in `src/main/claude.js`, and response parsing lives in `src/shared/core.js`. If claude.ai changes its endpoints, those are the files to fix. `test/fixtures/` holds real responses for the tests.
+Everything that differs between operating systems lives in `src/main/platform/`, behind one small interface described in `platform/index.js`. All claude.ai logic lives in `src/main/claude.js`, and response parsing lives in `src/shared/core.js`. If claude.ai changes its endpoints, those are the files to fix. `test/fixtures/` holds real responses for the tests.
 
 ### Privacy
 
@@ -133,13 +133,14 @@ Project layout:
 src/
   main/
     main.js              app lifecycle, widget window, tray menu, refresh scheduling
-    desktop-layer.js     keeps the widget on the desktop, below app windows
-    desktop-grid.js      reads the desktop icon grid so the widget can snap to it
-    win32.js             loads the few Windows functions the two files above use
     claude.js            sign-in window and claude.ai requests
     config.js            settings file
-    preload.js           the small API the widget page can call
-    theme-template.css   copied to the user's theme.css on first run
+    preload.js           the small API the widget and Settings pages can call
+    theme-template.css   copied to the user's custom CSS file on first run
+    platform/
+      index.js           picks the implementation for the current OS
+      windows/           desktop layer, icon grid and Windows API calls
+      fallback/          plain-window behaviour for other systems
   renderer/
     index.html           widget markup
     styles.css           built-in styles (all values are CSS variables)
@@ -148,7 +149,7 @@ src/
   shared/
     core.js              pure logic: peak hours, usage parsing, grid snapping, desktop placement, refresh scheduler
 test/
-  core.test.js           logic tests and a syntax check of every source file
+  core.test.js           logic tests, platform interface checks, and a syntax check of every source file
   fixtures/              real claude.ai usage responses used by the tests
 ```
 
@@ -188,7 +189,7 @@ Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/m
 
 ## Verify a build
 
-1. `npm test` passes (43 tests).
+1. `npm test` passes (46 tests).
 2. `npm start`, then sign in. The sign-in window appears once claude.ai has loaded, with no black screen. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
 3. Drag the widget a little and let go. It snaps to the same grid as your desktop icons.
 4. Click the widget, then click the desktop, then an app. The widget never disappears, not even briefly, and stays behind app windows. Press Win+D: the widget is visible.
