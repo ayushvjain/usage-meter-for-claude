@@ -12,7 +12,7 @@
     "test": "node --test test/core.test.js",
     "dist": "electron-builder --win nsis",
     "dist:store": "electron-builder --win appx",
-    "dist:mac": "electron-builder --mac dmg"
+    "dist:mac": "electron-builder --mac dmg --arm64 --x64"
   },
   "dependencies": {
     "koffi": "^2.9.0"
@@ -71,6 +71,7 @@
       ],
       "category": "public.app-category.utilities",
       "icon": "assets/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "extendInfo": {
         "LSUIElement": true
       }
