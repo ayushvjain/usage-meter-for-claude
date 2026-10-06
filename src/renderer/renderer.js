@@ -25,6 +25,7 @@
     footer: $('footer'),
     orgName: $('org-name'),
     orgPicker: $('org-picker'),
+    grip: $('resize-grip'),
     orgList: $('org-list'),
   };
 
@@ -60,47 +61,49 @@
 
   /* ---------- Rendering ---------- */
 
+  function buildLimit(limit, thresholds) {
+    const row = document.createElement('div');
+    row.className = limit.kind === 'session' ? 'limit limit--hero' : 'limit';
+    row.dataset.level = core.levelFor(limit.percent, thresholds);
+    row.dataset.key = limit.key;
+
+    const label = document.createElement('span');
+    label.className = 'limit-label';
+    label.textContent = limit.label;
+
+    const value = document.createElement('span');
+    value.className = 'limit-value';
+    value.textContent = formatPercent(limit.percent);
+    const unit = document.createElement('small');
+    unit.textContent = '%';
+    value.append(unit);
+
+    const track = document.createElement('div');
+    track.className = 'track';
+    track.setAttribute('role', 'progressbar');
+    track.setAttribute('aria-label', `${limit.label} used`);
+    track.setAttribute('aria-valuemin', '0');
+    track.setAttribute('aria-valuemax', '100');
+    track.setAttribute('aria-valuenow', formatPercent(limit.percent));
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.setProperty('--p', `${limit.percent}%`);
+    track.append(fill);
+
+    const reset = document.createElement('div');
+    reset.className = 'limit-reset';
+    reset.dataset.resetsAt = limit.resetsAt || '';
+    reset.dataset.kind = limit.kind;
+
+    row.append(label, value, track, reset);
+    return row;
+  }
+
+  /** One column of limits: the session first, then each weekly limit. */
   function renderLimits() {
     const thresholds = state.settings || {};
     els.limits.replaceChildren();
-
-    state.limits.forEach((limit) => {
-      const row = document.createElement('div');
-      row.className = limit.kind === 'session' ? 'limit limit--hero' : 'limit';
-      row.dataset.level = core.levelFor(limit.percent, thresholds);
-      row.dataset.key = limit.key;
-
-      const label = document.createElement('span');
-      label.className = 'limit-label';
-      label.textContent = limit.label;
-
-      const value = document.createElement('span');
-      value.className = 'limit-value';
-      value.textContent = formatPercent(limit.percent);
-      const unit = document.createElement('small');
-      unit.textContent = '%';
-      value.append(unit);
-
-      const track = document.createElement('div');
-      track.className = 'track';
-      track.setAttribute('role', 'progressbar');
-      track.setAttribute('aria-label', `${limit.label} used`);
-      track.setAttribute('aria-valuemin', '0');
-      track.setAttribute('aria-valuemax', '100');
-      track.setAttribute('aria-valuenow', formatPercent(limit.percent));
-      const fill = document.createElement('div');
-      fill.className = 'fill';
-      fill.style.setProperty('--p', `${limit.percent}%`);
-      track.append(fill);
-
-      const reset = document.createElement('div');
-      reset.className = 'limit-reset';
-      reset.dataset.resetsAt = limit.resetsAt || '';
-      reset.dataset.kind = limit.kind;
-
-      row.append(label, value, track, reset);
-      els.limits.append(row);
-    });
+    state.limits.forEach((limit) => els.limits.append(buildLimit(limit, thresholds)));
 
     if (state.status === 'ok' && state.limits.length === 0) {
       const empty = document.createElement('p');
@@ -115,8 +118,8 @@
     const root = document.documentElement;
     if (!settings || settings.theme === 'system' || !settings.theme) delete root.dataset.theme;
     else root.dataset.theme = settings.theme;
-    if (settings && settings.accent && settings.accent !== 'teal') root.dataset.accent = settings.accent;
-    else delete root.dataset.accent;
+    root.dataset.style = (settings && settings.style) || 'cozy';
+    root.dataset.accent = (settings && settings.accent) || 'clay';
     const opacity = settings && Number(settings.opacity);
     if (Number.isFinite(opacity)) root.style.setProperty('--bg-alpha', String(opacity / 100));
   }
@@ -153,6 +156,7 @@
 
     renderLimits();
     tick();
+    reportHeight();
   }
 
   function renderOrgChoices() {
@@ -231,19 +235,90 @@
 
   /* ---------- Window sizing ---------- */
 
-  // Reports how tall the panel needs to be. The main process rounds that up to whole
-  // desktop tiles, and the panel stretches to fill them with the footer at the bottom.
+  // Reports how tall the panel's content is and how wide its longest line is. The main
+  // process makes the window exactly that tall and just as wide, so the widget is square with
+  // even spacing for every plan. Text never wraps, so the height doesn't change with width.
+  function naturalContentHeight() {
+    const sections = Array.from(els.content.children).filter((el) => getComputedStyle(el).display !== 'none');
+    const gap = parseFloat(getComputedStyle(els.content).rowGap) || 0;
+    const total = sections.reduce((sum, el) => sum + el.offsetHeight, 0);
+    return total + gap * Math.max(0, sections.length - 1);
+  }
+
+  // Width of an element's text on one line, whatever width its box currently has.
+  function textWidth(el) {
+    if (!el || getComputedStyle(el).display === 'none' || !el.textContent) return 0;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    return range.getBoundingClientRect().width;
+  }
+
+  // The widest single line the widget shows, so the window is never too narrow for it.
+  // Measured from the text itself, so it can shrink as well as grow.
+  function longestLine() {
+    const SPACE = 16; // minimum space between the two sides of a row
+    const lines = [
+      textWidth(document.querySelector('.title')) + els.refresh.offsetWidth + els.menu.offsetWidth + SPACE,
+      textWidth(els.orgName),
+      textWidth(els.updated) + textWidth(els.next) + SPACE,
+    ];
+    if (!els.peak.hidden) lines.push(8 + 8 + textWidth(els.peakLabel) + SPACE + textWidth(els.peakCountdown));
+    if (!els.limits.hidden) {
+      els.limits.querySelectorAll('.limit').forEach((row) => {
+        lines.push(textWidth(row.querySelector('.limit-label')) + SPACE + textWidth(row.querySelector('.limit-value')));
+        lines.push(textWidth(row.querySelector('.limit-reset')));
+      });
+    }
+    return Math.max(...lines);
+  }
+
   function reportHeight() {
     const style = getComputedStyle(els.widget);
     const px = (name) => parseFloat(style[name]) || 0;
     const chrome = px('paddingTop') + px('paddingBottom') + px('borderTopWidth') + px('borderBottomWidth');
     const gap = parseFloat(style.rowGap) || 0;
-    meter.resize(Math.ceil(els.content.offsetHeight + gap + els.footer.offsetHeight + chrome));
+    const sideChrome = px('paddingLeft') + px('paddingRight') + px('borderLeftWidth') + px('borderRightWidth');
+    const widest = longestLine();
+    meter.resize({
+      height: Math.ceil(naturalContentHeight() + gap + els.footer.offsetHeight + chrome),
+      width: Math.ceil(widest + sideChrome),
+    });
   }
 
+  // Watch the sections themselves: the stretched content box can change size without them.
   const resizeObserver = new ResizeObserver(reportHeight);
-  resizeObserver.observe(els.content);
+  Array.from(els.content.children).forEach((el) => resizeObserver.observe(el));
   resizeObserver.observe(els.footer);
+
+  /* ---------- Resize corner ---------- */
+
+  // Dragging the corner zooms the whole widget, so everything grows together and it stays
+  // square. Moving right or down makes it bigger; left or up makes it smaller. The main
+  // process reads the pointer position, so this only reports when a drag starts, moves and ends.
+  let dragging = false;
+
+  els.grip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    els.grip.setPointerCapture(e.pointerId);
+    dragging = true;
+    els.widget.classList.add('is-resizing');
+    meter.resizeDrag('start');
+  });
+
+  els.grip.addEventListener('pointermove', () => {
+    if (dragging) meter.resizeDrag('move');
+  });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    els.widget.classList.remove('is-resizing');
+    meter.resizeDrag('end');
+  };
+  els.grip.addEventListener('pointerup', endDrag);
+  els.grip.addEventListener('pointercancel', endDrag);
+  els.grip.addEventListener('dblclick', () => meter.resizeDrag('reset'));
 
   /* ---------- Wiring ---------- */
 

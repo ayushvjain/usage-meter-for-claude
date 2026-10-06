@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage, nativeTheme } = require('electron');
-const { RefreshScheduler, parseUsage, gridLayout, snapToGrid, defaultTile, WIDGET_SIZES, ACCENTS, OPACITY_RANGE } = require('../shared/core');
+const { RefreshScheduler, parseUsage, gridLayout, snapToGrid, defaultTile, MIN_TILES, ACCENTS, STYLES, OPACITY_RANGE, SCALE_RANGE, clampScale } = require('../shared/core');
 const config = require('./config');
 const { ClaudeClient, AuthError, NoPlanError } = require('./claude');
 const platform = require('./platform');
@@ -26,6 +26,7 @@ let scheduler = null;
 let quitting = false;
 let cell = null;
 let contentHeight = DEFAULT_CONTENT_HEIGHT;
+let contentWidth = 0;
 let knownOrgs = [];
 let state = {
   status: 'loading',
@@ -47,9 +48,11 @@ function publicSettings() {
     warnAt: settings.warnAt,
     dangerAt: settings.dangerAt,
     refreshMinutes: settings.refreshMinutes,
+    style: settings.style,
     theme: settings.theme,
     accent: settings.accent,
     opacity: settings.opacity,
+    scale: currentScale(),
   };
 }
 
@@ -60,10 +63,11 @@ function settingsSnapshot() {
       refreshMinutes: settings.refreshMinutes,
       showPeakHours: settings.showPeakHours,
       startWithWindows: settings.startWithWindows,
+      style: settings.style,
       theme: settings.theme,
       accent: settings.accent,
       opacity: settings.opacity,
-      widgetSize: settings.widgetSize,
+      scale: currentScale(),
     },
     account: {
       status: state.status,
@@ -74,9 +78,10 @@ function settingsSnapshot() {
     },
     options: {
       refreshChoices: REFRESH_CHOICES,
+      styles: STYLES,
       accents: ACCENTS,
-      sizes: Object.keys(WIDGET_SIZES),
       opacity: OPACITY_RANGE,
+      scale: SCALE_RANGE,
     },
     app: {
       version: app.getVersion(),
@@ -118,7 +123,7 @@ function applySetting(key, value) {
   updateSetting(key, clean);
   if (key === 'refreshMinutes') scheduler.setIntervalMs(clean * 60 * 1000);
   if (key === 'startWithWindows' && !platform.loginItem.managedElsewhere) app.setLoginItemSettings({ openAtLogin: clean });
-  if (key === 'widgetSize') layoutWidget();
+  if (key === 'scale') applyScale();
 }
 
 async function runRefresh() {
@@ -225,7 +230,7 @@ function refreshCell() {
 }
 
 function currentLayout() {
-  return gridLayout({ cell, tilesWide: WIDGET_SIZES[settings.widgetSize], contentHeight, inset: TILE_INSET });
+  return gridLayout({ cell, minTiles: MIN_TILES, contentHeight, contentWidth, inset: TILE_INSET, scale: currentScale() });
 }
 
 function areaFor(point) {
@@ -249,6 +254,18 @@ function layoutWidget() {
   const { x, y } = tileFor({ width, height });
   const b = widget.getBounds();
   if (b.x !== x || b.y !== y || b.width !== width || b.height !== height) widget.setBounds({ x, y, width, height });
+}
+
+/** The size setting as a zoom factor. Always a valid number, even if the settings file is old. */
+function currentScale() {
+  return clampScale(settings && settings.scale);
+}
+
+/** Draws the widget at the size setting and resizes its window to match. */
+function applyScale() {
+  if (!widget || widget.isDestroyed()) return;
+  widget.webContents.setZoomFactor(currentScale());
+  layoutWidget();
 }
 
 /** After the user drags the widget, snap it to the nearest tile and remember it. */
@@ -286,10 +303,17 @@ function createWidget() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Chromium shares zoom between pages of the same origin in the same session. The
+      // widget gets a session of its own, so its size setting doesn't zoom the Settings window.
+      partition: 'widget',
     },
   });
 
   widget.loadFile(path.join(RENDERER, 'index.html'));
+  // Zoom is applied once the page has loaded, and again on every reload.
+  widget.webContents.on('did-finish-load', () => {
+    if (widget && !widget.isDestroyed()) widget.webContents.setZoomFactor(currentScale());
+  });
   widget.once('ready-to-show', () => {
     widget.showInactive();
     desktopPin = platform.pinToDesktop(widget);
@@ -424,15 +448,51 @@ function registerIpc() {
     sendState();
   });
 
+  // Dragging the resize corner. The pointer is read here, in screen pixels, so the maths
+  // doesn't depend on the page's zoom. While dragging, the size is applied but not saved; it
+  // is saved once, when the drag ends. Double-clicking the corner sends 'reset'.
+  let resizeDrag = null;
+  const setScale = (value) => {
+    const scale = clampScale(value);
+    if (scale === currentScale()) return;
+    settings = { ...settings, scale };
+    applyScale();
+    sendState();
+    sendSettings();
+  };
+  ipcMain.on('widget:resize-drag', (_event, phase) => {
+    if (!widget || widget.isDestroyed()) return;
+    const cursor = screen.getCursorScreenPoint();
+    if (phase === 'start') {
+      const b = widget.getBounds();
+      resizeDrag = { x: cursor.x, y: cursor.y, scale: currentScale(), size: Math.max(b.width, b.height) };
+    } else if (phase === 'move' && resizeDrag) {
+      const delta = Math.max(cursor.x - resizeDrag.x, cursor.y - resizeDrag.y);
+      setScale(resizeDrag.scale * ((resizeDrag.size + delta) / resizeDrag.size));
+    } else if (phase === 'end') {
+      resizeDrag = null;
+      config.save(settings);
+    } else if (phase === 'reset') {
+      resizeDrag = null;
+      setScale(1);
+      config.save(settings);
+    }
+  });
+
   ipcMain.on('widget:menu', () => {
     if (widget) buildMenu().popup({ window: widget });
   });
 
-  // The widget reports how tall its content is; the window becomes that many whole tiles.
-  ipcMain.on('widget:resize', (_event, requested) => {
-    const h = Math.round(Number(requested));
-    if (!Number.isFinite(h) || h <= 0 || h > 2000 || h === contentHeight) return;
+  // The widget reports how tall its content is and how wide its longest line is. Text never
+  // wraps, so the height doesn't depend on the width: the window becomes exactly that tall
+  // and as wide as it is tall (or as wide as the longest line, if that's wider).
+  ipcMain.on('widget:resize', (_event, report) => {
+    const h = Math.round(Number(report && report.height));
+    const w = Math.round(Number(report && report.width)) || 0;
+    if (!Number.isFinite(h) || h <= 0 || h > 2000 || w < 0 || w > 3000) return;
+    if (h === contentHeight && w === contentWidth) return;
     contentHeight = h;
+    contentWidth = w;
     layoutWidget();
   });
 }

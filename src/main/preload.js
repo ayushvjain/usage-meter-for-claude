@@ -9,7 +9,8 @@ contextBridge.exposeInMainWorld('meter', {
   onTheme: (callback) => ipcRenderer.on('theme', (_event, css) => callback(css)),
   refresh: () => ipcRenderer.invoke('usage:refresh'),
   openMenu: () => ipcRenderer.send('widget:menu'),
-  resize: (height) => ipcRenderer.send('widget:resize', height),
+  resize: (report) => ipcRenderer.send('widget:resize', report),
+  resizeDrag: (phase) => ipcRenderer.send('widget:resize-drag', String(phase)),
   ready: () => ipcRenderer.send('widget:ready'),
 
   // Account

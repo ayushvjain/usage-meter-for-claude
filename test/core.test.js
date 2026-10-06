@@ -376,23 +376,71 @@ test('grid: decodes the desktop icon spacing into device-independent pixels', ()
   assert.equal(core.decodeItemSpacing((5 << 16) | 5, 1), null, 'nonsense values are rejected');
 });
 
-test('grid: the widget is a whole number of tiles', () => {
-  const medium = core.gridLayout({ cell: CELL, tilesWide: core.WIDGET_SIZES.medium, contentHeight: 300, inset: 4 });
-  assert.deepEqual(medium, { width: 300, height: 360, cols: 4, rows: 4 });
-  const exact = core.gridLayout({ cell: CELL, tilesWide: 3, contentHeight: 262, inset: 4 });
-  assert.equal(exact.rows, 3, 'content that fits exactly does not add a tile');
-  assert.equal(core.gridLayout({ cell: CELL, tilesWide: 5, contentHeight: 0, inset: 4 }).rows, 1);
+test('size: the widget is square and exactly as tall as its content', () => {
+  const cell = { w: 75, h: 75 };
+  for (const content of [290, 380, 514]) {
+    const { width, height } = core.gridLayout({ cell, minTiles: core.MIN_TILES, contentHeight: content, inset: 4 });
+    assert.equal(height, content + 8, 'no spare space above or below the content');
+    assert.equal(width, height, 'square');
+  }
+});
+
+test('size: never narrower than three tiles', () => {
+  const short = core.gridLayout({ cell: { w: 75, h: 75 }, minTiles: core.MIN_TILES, contentHeight: 150, inset: 4 });
+  assert.deepEqual(short, { width: 225, height: 158 });
+});
+
+test('size: widens for a long line instead of wrapping it', () => {
+  const layout = core.gridLayout({ cell: { w: 75, h: 75 }, minTiles: core.MIN_TILES, contentHeight: 200, contentWidth: 280, inset: 4 });
+  assert.deepEqual(layout, { width: 288, height: 208 });
+});
+
+test('size: the size setting zooms the whole widget', () => {
+  const cell = { w: 75, h: 75 };
+  const normal = core.gridLayout({ cell, minTiles: core.MIN_TILES, contentHeight: 300, contentWidth: 250, inset: 4 });
+  const big = core.gridLayout({ cell, minTiles: core.MIN_TILES, contentHeight: 300, contentWidth: 250, inset: 4, scale: 1.5 });
+  assert.deepEqual(normal, { width: 308, height: 308 });
+  assert.deepEqual(big, { width: 462, height: 462 }, '1.5 times as big, still square');
+});
+
+test('size: the size setting stays within range, in 5% steps', () => {
+  assert.equal(core.clampScale(1), 1);
+  assert.equal(core.clampScale(1.33), 1.35);
+  assert.equal(core.clampScale(9), core.SCALE_RANGE.max);
+  assert.equal(core.clampScale(0.1), core.SCALE_RANGE.min);
+  assert.equal(core.clampScale('nonsense'), 1);
+});
+
+test('size: fractional measurements round up to whole pixels', () => {
+  assert.equal(core.gridLayout({ cell: CELL, minTiles: 3, contentHeight: 300.4, inset: 4 }).height, 309);
 });
 
 test('grid: a dropped widget snaps to the nearest tile', () => {
   const snapped = core.snapToGrid({ x: 190, y: 140, width: 300, height: 360 }, AREA, CELL);
-  assert.deepEqual(snapped, { x: 225, y: 180, col: 3, row: 2 });
+  assert.deepEqual(snapped, { x: 225, y: 180 });
 });
 
 test('grid: a widget dragged past the edge stays fully on screen', () => {
   const snapped = core.snapToGrid({ x: 1900, y: 1000, width: 300, height: 360 }, AREA, CELL);
   assert.ok(snapped.x + 300 <= AREA.width && snapped.y + 360 <= AREA.height);
-  assert.deepEqual(core.snapToGrid({ x: -50, y: -50, width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0, col: 0, row: 0 });
+  assert.deepEqual(core.snapToGrid({ x: -50, y: -50, width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0 });
+});
+
+test('grid: the widget can sit flush in the right and bottom corners', () => {
+  // A 314px widget on a 2560 x 1392 screen with 75 x 90 tiles. The last tile that fits
+  // leaves a 46px strip on the right; dropping it near the edge puts it flush instead.
+  const screen = { x: 0, y: 0, width: 2560, height: 1392 };
+  const size = { width: 314, height: 314 };
+  const corner = core.snapToGrid({ x: 2240, y: 1070, ...size }, screen, CELL);
+  assert.deepEqual(corner, { x: 2560 - 314, y: 1392 - 314 }, 'flush with the bottom-right corner');
+  const topRight = core.snapToGrid({ x: 2246, y: 4, ...size }, screen, CELL);
+  assert.deepEqual(topRight, { x: 2246, y: 0 }, 'flush right, on the top row');
+});
+
+test('grid: dropped nearer the last tile than the edge, it stays on the grid', () => {
+  const screen = { x: 0, y: 0, width: 2560, height: 1392 };
+  const snapped = core.snapToGrid({ x: 2210, y: 0, width: 314, height: 314 }, screen, CELL);
+  assert.equal(snapped.x, 2175, 'last tile column (29 x 75)');
 });
 
 test('grid: tiles are measured from the work area of a second monitor', () => {
@@ -403,9 +451,9 @@ test('grid: tiles are measured from the work area of a second monitor', () => {
 });
 
 test('grid: a new widget starts in the top-left tile', () => {
-  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0, col: 0, row: 0 });
+  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, AREA, CELL), { x: 0, y: 0 });
   const right = { x: 1920, y: 0, width: 2560, height: 1392 };
-  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, right, CELL), { x: 1920, y: 0, col: 0, row: 0 }, 'top-left of that screen');
+  assert.deepEqual(core.defaultTile({ width: 300, height: 360 }, right, CELL), { x: 1920, y: 0 }, 'top-left of that screen');
 });
 
 /* ---------- Platforms: every OS implements the same interface ---------- */

@@ -301,7 +301,9 @@
   const FALLBACK_CELL = Object.freeze({ w: 75, h: 75 });
 
   // Widget widths in desktop-icon tiles.
-  const WIDGET_SIZES = Object.freeze({ small: 3, medium: 4, large: 5 });
+  // The narrowest the widget gets, in desktop-icon tiles, so text never gets squeezed. Above
+  // that it is as wide as its content is tall, so it stays square whatever the account shows.
+  const MIN_TILES = 3;
 
   /**
    * Turns the desktop list view's LVM_GETITEMSPACING result (cell width in the low word,
@@ -318,27 +320,49 @@
   }
 
   /**
-   * Window size for the widget: a whole number of tiles wide (from the size setting) and as
-   * many whole tiles tall as the content needs. `inset` is the transparent margin around the
-   * panel inside the window, so neighbouring icons don't touch it.
+   * Window size for the widget. The content is one column, so its height decides the size:
+   * the window is exactly as tall as the content (no spare space anywhere) and as wide as it
+   * is tall, so it is square for every plan. It is never narrower than `minTiles` desktop
+   * tiles, or than its longest line (`contentWidth`), since text doesn't wrap. The position
+   * still snaps to the icon grid (see snapToGrid). `inset` is the transparent margin around
+   * the panel inside the window. `scale` is the user's size setting: the content is measured
+   * at 100% and drawn at this zoom, so the window grows by the same factor.
    */
-  function gridLayout({ cell, tilesWide, contentHeight, inset }) {
+  function gridLayout({ cell, minTiles, contentHeight, contentWidth = 0, inset, scale = 1 }) {
     const c = cell || FALLBACK_CELL;
-    const cols = Math.max(1, Math.round(tilesWide || WIDGET_SIZES.medium));
-    const rows = Math.max(1, Math.ceil((Math.max(0, contentHeight) + 2 * (inset || 0)) / c.h));
-    return { width: cols * c.w, height: rows * c.h, cols, rows };
+    const z = clampScale(scale);
+    const pad = 2 * (inset || 0) * z;
+    const min = Math.max(1, Math.round(minTiles || MIN_TILES)) * c.w;
+    const height = Math.max(1, Math.ceil(Math.max(0, contentHeight) * z + pad));
+    const widest = Math.ceil(Math.max(0, contentWidth) * z + pad);
+    const width = Math.max(min, height, widest);
+    return { width, height };
   }
 
-  /** Nearest tile position for a window, kept fully inside the work area. */
+  /**
+   * Snaps one axis: to the nearest tile, or flush with the far edge of the screen.
+   * The widget is rarely a whole number of tiles, so the last tile that fits can leave a
+   * strip of up to one tile at the right or bottom edge. Dropping the widget nearer the
+   * edge than that last tile puts it flush against the edge, so it can sit in any corner.
+   */
+  function snapAxis(pos, size, start, length, step) {
+    const maxGrid = start + Math.max(0, Math.floor((length - size) / step)) * step;
+    const edge = start + Math.max(0, length - size);
+    const nearest = start + Math.round((pos - start) / step) * step;
+    const onGrid = Math.min(Math.max(nearest, start), maxGrid);
+    if (edge > onGrid && Math.abs(pos - edge) < Math.abs(pos - onGrid)) return edge;
+    return onGrid;
+  }
+
+  /** Nearest tile position (or screen edge) for a window, kept fully inside the work area. */
   function snapToGrid({ x, y, width, height }, area, cell) {
     const c = cell || FALLBACK_CELL;
-    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const maxCol = Math.max(0, Math.floor((area.width - width) / c.w));
-    const maxRow = Math.max(0, Math.floor((area.height - height) / c.h));
-    const col = clamp(Math.round((x - area.x) / c.w), 0, maxCol);
-    const row = clamp(Math.round((y - area.y) / c.h), 0, maxRow);
-    return { x: area.x + col * c.w, y: area.y + row * c.h, col, row };
+    return {
+      x: snapAxis(x, width, area.x, area.width, c.w),
+      y: snapAxis(y, height, area.y, area.height, c.h),
+    };
   }
+
 
   /** The top-left tile of the screen, used when the widget has never been placed or is reset. */
   function defaultTile({ width, height }, area, cell) {
@@ -348,8 +372,21 @@
   /* ---------- Appearance ---------- */
 
   const THEMES = Object.freeze(['system', 'dark', 'light']);
-  const ACCENTS = Object.freeze(['teal', 'blue', 'violet', 'amber', 'rose']);
+  // Cozy: warm paper colours, serif numbers and hand-drawn lines. Classic: the original look.
+  const STYLES = Object.freeze(['cozy', 'classic']);
+  const ACCENTS = Object.freeze(['clay', 'teal', 'blue', 'violet', 'amber', 'rose']);
   const OPACITY_RANGE = Object.freeze({ min: 60, max: 100 });
+
+  // The widget's size as a zoom: 100% is the default. Bigger screens can go up to 250%.
+  const SCALE_RANGE = Object.freeze({ min: 0.8, max: 2.5, step: 0.05 });
+
+  /** Keeps a size within range, rounded to 5% steps so saved values stay tidy. */
+  function clampScale(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return 1;
+    const stepped = Math.round(n / SCALE_RANGE.step) * SCALE_RANGE.step;
+    return Math.round(Math.min(SCALE_RANGE.max, Math.max(SCALE_RANGE.min, stepped)) * 100) / 100;
+  }
 
   /* ---------- Refresh scheduling ---------- */
 
@@ -435,13 +472,16 @@
     HWND_TOP,
     planDesktopPlacement,
     FALLBACK_CELL,
-    WIDGET_SIZES,
+    MIN_TILES,
     decodeItemSpacing,
     gridLayout,
     snapToGrid,
     defaultTile,
     THEMES,
+    STYLES,
     ACCENTS,
     OPACITY_RANGE,
+    SCALE_RANGE,
+    clampScale,
   };
 });
