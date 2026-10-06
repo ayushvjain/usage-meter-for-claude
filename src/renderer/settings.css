@@ -18,6 +18,7 @@
   color-scheme: dark;
 }
 
+:root[data-accent="clay"] { --accent-on-dark: #e3895f; --accent-on-light: #c4643f; }
 :root[data-accent="blue"] { --accent-on-dark: #6aa8ff; --accent-on-light: #2563eb; }
 :root[data-accent="violet"] { --accent-on-dark: #a796f5; --accent-on-light: #6c58d6; }
 :root[data-accent="amber"] { --accent-on-dark: #f2b544; --accent-on-light: #b7790a; }
@@ -420,4 +421,55 @@ select {
   .switch::after {
     transition: none;
   }
+}
+
+/* ---------- Cozy style: same warm palette and serif headings as the widget ---------- */
+
+:root[data-style="cozy"] {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --page: #292521;
+  --surface: #332e29;
+  --nav: #221f1b;
+  --border: rgba(242, 236, 227, 0.12);
+  --text: #f2ece3;
+  --muted: #b5aa9b;
+  --hover: rgba(242, 236, 227, 0.07);
+  --on-accent: #2a1f18;
+  --danger: #e06a52;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-style="cozy"]:not([data-theme="dark"]) {
+    --page: #faf6ef;
+    --surface: #fffdf9;
+    --nav: #f2ebe0;
+    --border: rgba(59, 50, 42, 0.14);
+    --text: #3b322a;
+    --muted: #857565;
+    --hover: rgba(59, 50, 42, 0.05);
+    --on-accent: #fffaf3;
+    --danger: #b84a33;
+  }
+}
+
+:root[data-style="cozy"][data-theme="light"] {
+  --page: #faf6ef;
+  --surface: #fffdf9;
+  --nav: #f2ebe0;
+  --border: rgba(59, 50, 42, 0.14);
+  --text: #3b322a;
+  --muted: #857565;
+  --hover: rgba(59, 50, 42, 0.05);
+  --on-accent: #fffaf3;
+  --danger: #b84a33;
+}
+
+[data-style="cozy"] .panel h1,
+[data-style="cozy"] .about-name {
+  font-family: var(--font-serif);
+}
+
+[data-style="cozy"] .segmented button,
+[data-style="cozy"] .btn {
+  border-radius: 999px;
 }

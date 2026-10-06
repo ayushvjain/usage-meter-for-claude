@@ -26,6 +26,11 @@
   --accent-on-light: #1a9682;
 }
 
+:root[data-accent="clay"] {
+  --accent-on-dark: #e3895f;
+  --accent-on-light: #c4643f;
+}
+
 :root[data-accent="blue"] {
   --accent-on-dark: #6aa8ff;
   --accent-on-light: #2563eb;
@@ -101,6 +106,15 @@
 
 /* ---------- Layout ---------- */
 
+/* Text never wraps, so the widget's height doesn't change with its width; the widget
+   widens to fit its longest line instead. */
+.limit-label,
+.limit-reset,
+.peak-row,
+.footer span {
+  white-space: nowrap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -130,6 +144,7 @@ body {
 
 /* The panel fills its tiles; the footer sits at the bottom of the last tile. */
 .widget {
+  position: relative;
   height: 100%;
   margin: 0;
   padding: var(--pad);
@@ -150,6 +165,42 @@ body {
 
 .footer {
   margin-top: auto;
+}
+
+/* ---------- Resize corner ---------- */
+
+/* Three short diagonal lines in the bottom-right corner, shown when the pointer is over the widget. */
+.resize-grip {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  -webkit-app-region: no-drag;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  background: linear-gradient(
+    135deg,
+    transparent 0 46%,
+    var(--muted) 46% 54%,
+    transparent 54% 66%,
+    var(--muted) 66% 74%,
+    transparent 74% 86%,
+    var(--muted) 86% 94%,
+    transparent 94%
+  );
+}
+
+.widget:hover .resize-grip,
+.widget.is-resizing .resize-grip {
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resize-grip {
+    transition: none;
+  }
 }
 
 /* ---------- Header (drag handle) ---------- */
@@ -294,6 +345,12 @@ body {
 .limit--hero {
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border);
+}
+
+/* With only a session limit there is nothing below it to separate. */
+.limit--hero:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .limit--hero .limit-value {
@@ -490,4 +547,92 @@ body {
   .fill {
     transition: none;
   }
+}
+
+/* ==========================================================================
+   Cozy style (Settings > Appearance > Style)
+   Warm paper colours, serif headings and numbers, and a simpler layout.
+   Everything above still applies; this only overrides it.
+   ========================================================================== */
+
+:root[data-style="cozy"] {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-numbers: var(--font-serif);
+  --radius: 18px;
+  --hero-size: 40px;
+  --hero-bar-height: 10px;
+  --bar-height: 6px;
+
+  /* Warm dark: a cup of coffee at night. */
+  --bg-rgb: 41, 37, 33;
+  --border: rgba(242, 236, 227, 0.12);
+  --text: #f2ece3;
+  --muted: #b5aa9b;
+  --track: rgba(242, 236, 227, 0.1);
+  --hover: rgba(242, 236, 227, 0.08);
+  --warn: #e0a84e;
+  --danger: #e06a52;
+  --peak: #e0a84e;
+  --on-accent: #2a1f18;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-style="cozy"]:not([data-theme="dark"]) {
+    --bg-rgb: 250, 246, 239;
+    --border: rgba(59, 50, 42, 0.14);
+    --text: #3b322a;
+    --muted: #857565;
+    --track: rgba(59, 50, 42, 0.09);
+    --hover: rgba(59, 50, 42, 0.06);
+    --warn: #b8801c;
+    --danger: #b84a33;
+    --peak: #b8801c;
+    --on-accent: #fffaf3;
+  }
+}
+
+/* Warm light: paper. */
+:root[data-style="cozy"][data-theme="light"] {
+  --bg-rgb: 250, 246, 239;
+  --border: rgba(59, 50, 42, 0.14);
+  --text: #3b322a;
+  --muted: #857565;
+  --track: rgba(59, 50, 42, 0.09);
+  --hover: rgba(59, 50, 42, 0.06);
+  --warn: #b8801c;
+  --danger: #b84a33;
+  --peak: #b8801c;
+  --on-accent: #fffaf3;
+}
+
+[data-style="cozy"] .title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+[data-style="cozy"] .limit-label {
+  font-weight: 500;
+}
+
+[data-style="cozy"] .limit--hero .limit-value {
+  letter-spacing: 0;
+}
+
+/* Simpler: peak hours is one line, without the 24-hour strip. */
+[data-style="cozy"] .day-strip,
+[data-style="cozy"] .strip-scale {
+  display: none;
+}
+
+[data-style="cozy"] .primary-btn {
+  border-radius: 999px;
+  padding: 8px 18px;
+}
+
+[data-style="cozy"] .footer {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 12px;
 }
