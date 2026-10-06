@@ -35,7 +35,7 @@ On first launch, click **Sign in**. claude.ai opens in its own window once its p
 
 It's a desktop widget: it sits on your desktop, above the wallpaper and icons and below every app window. Open windows cover it, just like desktop icons, and pressing **Win+D** (Show desktop) brings it into view. It doesn't appear in the taskbar or in Alt+Tab.
 
-Like a large desktop icon, it sits on your desktop icon grid and takes up whole tiles: 3, 4 or 5 tiles wide, and as many tiles tall as it needs. Drag it by its title and it snaps to the nearest tile when you let go. It remembers where you put it.
+The widget sizes itself to what your account shows: it is exactly as tall as its content and just as wide, so it's a square with the same even spacing on every plan. Accounts with more limits get a bigger square. To make the whole widget bigger, for example on a large monitor, drag its bottom-right corner (double-click the corner to go back to 100%), or use **Settings → Appearance → Size**. Like a desktop icon, it sits on your icon grid: drag it by its title and it snaps to the nearest tile when you let go. It remembers where you put it.
 
 Click the `⋯` button on the widget, or right-click the tray icon, for **Refresh now**, **Settings**, **Hide widget** and **Quit**. Clicking the tray icon hides or shows the widget.
 
@@ -44,7 +44,7 @@ Click the `⋯` button on the widget, or right-click the tray icon, for **Refres
 Open **Settings** from the `⋯` menu or the tray icon. Everything is there, no files to edit:
 
 - **General:** how often to refresh (1 to 30 minutes), whether to show peak hours, and whether to start with Windows.
-- **Appearance:** theme (System, Dark or Light), accent colour, background opacity, widget size (Small, Medium or Large), and resetting the widget's position.
+- **Appearance:** style (Cozy, with warm colours and serif numbers, or Classic), theme (System, Dark or Light), accent colour, background opacity, size (80% to 250%), and resetting the widget's position.
 - **Account:** sign in or out, choose the organization to show if your account has several, and open claude.ai.
 - **About:** version and a link to this repository.
 
@@ -189,13 +189,14 @@ Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/m
 
 ## Verify a build
 
-1. `npm test` passes (46 tests).
+1. `npm test` passes (53 tests).
 2. `npm start`, then sign in. The sign-in window appears once claude.ai has loaded, with no black screen. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
 3. Drag the widget a little and let go. It snaps to the same grid as your desktop icons.
 4. Click the widget, then click the desktop, then an app. The widget never disappears, not even briefly, and stays behind app windows. Press Win+D: the widget is visible.
-5. Open **Settings**. Change the theme, accent, opacity and size: the widget updates straight away. Switch organization under Account: the widget shows that organization.
-6. Click refresh. The footer jumps back to about "Next refresh in 5:00".
-7. Choose **Sign out** in Settings > Account. The widget asks you to sign in again.
+5. Open **Settings**. Switch the style between Cozy and Classic, and change the theme, accent and opacity: the widget updates straight away. Switch organization under Account: the widget shows that organization.
+6. Check the widget is square with even spacing: the gap above the title matches the gap below the footer, with no empty band anywhere. Drag the bottom-right corner: the whole widget grows and stays square. Double-click the corner: it goes back to 100%.
+7. Click refresh. The footer jumps back to about "Next refresh in 5:00".
+8. Choose **Sign out** in Settings > Account. The widget asks you to sign in again.
 
 ## Contributing
 
