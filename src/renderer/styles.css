@@ -551,7 +551,8 @@ body {
 
 /* ==========================================================================
    Cozy style (Settings > Appearance > Style)
-   Warm paper colours, serif headings and numbers, and a simpler layout.
+   Warm paper colours, a serif title and percentages, and a simpler layout. Everything
+   else, including the footer, uses the same font as the Classic style.
    Everything above still applies; this only overrides it.
    ========================================================================== */
 
@@ -629,10 +630,4 @@ body {
 [data-style="cozy"] .primary-btn {
   border-radius: 999px;
   padding: 8px 18px;
-}
-
-[data-style="cozy"] .footer {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 12px;
 }
