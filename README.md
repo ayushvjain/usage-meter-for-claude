@@ -159,7 +159,7 @@ test/
 
 ```bash
 npm run dist         # dist/Usage Meter for Claude Setup <version>.exe, for GitHub Releases
-npm run dist:store   # dist/*.appx, for the Microsoft Store
+npm run dist:store   # dist/*.appx, for the Microsoft Store (needs store-identity.json)
 ```
 
 ### Code signing
@@ -177,19 +177,17 @@ The plan for this project: publish to the Microsoft Store for a warning-free ins
 
 ### Publishing to the Microsoft Store
 
-1. Create a Microsoft Partner Center developer account and reserve the app name.
-2. In Partner Center, open **Product identity** and copy the package identity name, publisher ID (`CN=…`) and publisher display name into the `build.appx` section of `package.json`.
+1. Create a Microsoft Store developer account (free for individuals) at https://storedeveloper.microsoft.com and reserve the app name in Partner Center.
+2. In Partner Center, open **Product management → Product identity**. Copy `store-identity.example.json` to `store-identity.json` and fill in the three values. `store-identity.json` is ignored by Git, so your account details stay out of the repository.
 3. Run `npm run dist:store` and upload the `.appx` from `dist/`. The Store signs it for you.
 4. Store tiles come from `build/appx/`. Replace those PNGs with your own artwork if you like.
-5. In the listing, say clearly that the app is not affiliated with Anthropic.
+5. In the listing, say clearly that the app is not affiliated with Anthropic. `docs/store-listing.md` has the listing text.
 
 In Store builds, "Start with Windows" is managed by Windows (Settings > Apps > Startup), so that setting is disabled there.
 
-Before your first release, replace `REPLACE_WITH_YOUR_GITHUB_USERNAME` in `src/main/main.js` with your GitHub username so **About and source code** opens your repo.
-
 ## Verify a build
 
-1. `npm test` passes (53 tests).
+1. `npm test` passes (55 tests).
 2. `npm start`, then sign in. The sign-in window appears once claude.ai has loaded, with no black screen. If your account has several organizations, pick one. The session, weekly and peak sections appear, and the footer counts down from "Next refresh in 5:00".
 3. Drag the widget a little and let go. It snaps to the same grid as your desktop icons.
 4. Click the widget, then click the desktop, then an app. The widget never disappears, not even briefly, and stays behind app windows. Press Win+D: the widget is visible.

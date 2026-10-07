@@ -3,3 +3,6 @@ dist/
 out/
 *.log
 .DS_Store
+
+# Microsoft Store identity for local builds (see store-identity.example.json)
+store-identity.json
