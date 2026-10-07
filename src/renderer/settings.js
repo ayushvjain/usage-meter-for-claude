@@ -111,9 +111,6 @@
     let opacityTimer = null;
     opacity.addEventListener('input', () => {
       $('opacity-value').value = `${opacity.value}%`;
-    const scale = $('scale');
-    if (document.activeElement !== scale) scale.value = String(Math.round(st.scale * 100));
-    $('scale-value').value = `${scale.value}%`;
       clearTimeout(opacityTimer);
       opacityTimer = setTimeout(() => meter.setSetting('opacity', Number(opacity.value)), 120);
     });
@@ -211,6 +208,9 @@
     const opacity = $('opacity');
     if (document.activeElement !== opacity) opacity.value = String(st.opacity);
     $('opacity-value').value = `${opacity.value}%`;
+    const scale = $('scale');
+    if (document.activeElement !== scale) scale.value = String(Math.round(st.scale * 100));
+    $('scale-value').value = `${scale.value}%`;
 
     renderAccount(s.account);
 

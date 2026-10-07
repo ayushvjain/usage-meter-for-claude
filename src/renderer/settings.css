@@ -103,13 +103,6 @@ input {
   gap: 2px;
 }
 
-.nav-title {
-  margin: 0 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
 .nav-item {
   text-align: left;
   border: 0;
