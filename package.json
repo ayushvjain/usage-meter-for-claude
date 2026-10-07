@@ -9,9 +9,9 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/core.test.js",
-    "dist": "electron-builder --win nsis",
-    "dist:store": "electron-builder --win appx"
+    "test": "node --test test/core.test.js test/build-store.test.js",
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:store": "node scripts/build-store.js"
   },
   "dependencies": {
     "koffi": "^2.9.0"
@@ -49,9 +49,9 @@
     },
     "appx": {
       "applicationId": "UsageMeterForClaude",
-      "identityName": "REPLACE_WITH_PACKAGE_IDENTITY_NAME",
-      "publisher": "CN=REPLACE_WITH_PUBLISHER_ID",
-      "publisherDisplayName": "REPLACE_WITH_PUBLISHER_DISPLAY_NAME",
+      "identityName": "SET_IN_store-identity.json",
+      "publisher": "CN=SET_IN_store-identity.json",
+      "publisherDisplayName": "SET_IN_store-identity.json",
       "displayName": "Usage Meter for Claude",
       "backgroundColor": "#131B29",
       "languages": [
