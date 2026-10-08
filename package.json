@@ -9,9 +9,8 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/core.test.js test/build-store.test.js",
-    "dist": "electron-builder --win nsis --publish never",
-    "dist:store": "node scripts/build-store.js"
+    "test": "node --test test/core.test.js",
+    "dist": "electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "koffi": "^2.9.0"
@@ -24,7 +23,6 @@
     "appId": "com.usagemeter.claude",
     "productName": "Usage Meter for Claude",
     "directories": {
-      "buildResources": "build",
       "output": "dist"
     },
     "files": [
@@ -46,17 +44,6 @@
       "oneClick": true,
       "perMachine": false,
       "shortcutName": "Usage Meter for Claude"
-    },
-    "appx": {
-      "applicationId": "UsageMeterForClaude",
-      "identityName": "SET_IN_store-identity.json",
-      "publisher": "CN=SET_IN_store-identity.json",
-      "publisherDisplayName": "SET_IN_store-identity.json",
-      "displayName": "Usage Meter for Claude",
-      "backgroundColor": "#131B29",
-      "languages": [
-        "en-US"
-      ]
     }
   }
 }

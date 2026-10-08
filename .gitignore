@@ -4,5 +4,6 @@ out/
 *.log
 .DS_Store
 
-# Microsoft Store identity for local builds (see store-identity.example.json)
+# Local release tooling and Store identity: kept on the maintainer's machine only
+release/
 store-identity.json
