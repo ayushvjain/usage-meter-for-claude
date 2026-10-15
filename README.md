@@ -1,6 +1,6 @@
 # Usage Meter for Claude
 
-A small Windows desktop widget that shows how much of your Claude plan you have used, when each limit resets, and whether Claude's peak hours are on right now.
+A small Windows desktop widget — and a Chrome extension — that show how much of your Claude plan you have used, when each limit resets, and whether Claude's peak hours are on right now.
 
 <a href="https://apps.microsoft.com/detail/9PKK2BWSPQG6?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get it from Microsoft" /></a>
 
@@ -32,6 +32,17 @@ Bars turn amber and then red as you get close to a limit. Your claude.ai chats, 
 **Or** download the installer from [Releases](../../releases). Windows may show **"Windows protected your PC"**, because the installer isn't signed; click **More info**, then **Run anyway**.
 
 Works on Windows 10 and 11. A macOS version is in progress.
+
+### Chrome extension
+
+The same meter, in your browser toolbar: click the icon and the panel drops down; click anywhere else and it closes. It uses the claude.ai session already in your browser, so there's no separate sign-in.
+
+<p>
+  <img src="docs/chrome-popup-dark.png" width="280" alt="Chrome popup in dark mode" />
+  <img src="docs/chrome-popup-light.png" width="280" alt="Chrome popup in light mode" />
+</p>
+
+It isn't in the Chrome Web Store yet: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose this repository's `extension` folder. See [docs/chrome-extension.md](docs/chrome-extension.md) for the details.
 
 ## Getting started
 

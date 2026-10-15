@@ -2,7 +2,7 @@
   "name": "usage-meter-for-claude",
   "productName": "Usage Meter for Claude",
   "version": "0.2.0",
-  "description": "A small Windows desktop widget that shows your Claude session and weekly usage, reset countdowns and peak hours.",
+  "description": "A small Windows desktop widget, and a Chrome extension, that show your Claude session and weekly usage, reset countdowns and peak hours.",
   "main": "src/main/main.js",
   "author": "Ayush",
   "license": "MIT",

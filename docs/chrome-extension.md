@@ -1,0 +1,87 @@
+# Chrome extension
+
+The same meter as the desktop widget, in the browser toolbar. Click the toolbar icon and the
+panel drops down under it; click anywhere else and it closes, the way every Chrome popup does.
+
+<p>
+  <img src="chrome-popup-dark.png" width="300" alt="Popup in dark mode" />
+  <img src="chrome-popup-light.png" width="300" alt="Popup in light mode" />
+</p>
+
+It lives in [`extension/`](../extension) and works in Chrome, Edge, Brave and other
+Chromium browsers (Manifest V3, Chrome 116 or newer).
+
+## Install it
+
+It isn't in the Chrome Web Store yet, so load it from this repository:
+
+1. Clone or download this repository.
+2. Open `chrome://extensions` and turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `extension` folder.
+4. Pin **Usage Meter for Claude** to the toolbar, and click it.
+
+## Signing in
+
+There is no separate sign-in. The extension reads your usage with the claude.ai session that
+is already in your browser, so if you're signed in to claude.ai in a tab, the popup works. If
+you're not, it offers to open claude.ai; sign in there and click refresh.
+
+This is the one real difference from the desktop app, which keeps a browser profile of its own.
+
+## What it shows
+
+Exactly what the widget shows, in the same layout:
+
+- **Current session** (the 5-hour window), large, with the time until it resets.
+- **Weekly limits**, one bar each, with their reset day and countdown.
+- **Peak hours** and a countdown to the next change, in your local time.
+- A footer with when the numbers were last updated and when the next refresh is due.
+
+The toolbar icon also carries your session percentage as a badge, so you can see it without
+opening the popup. Turn it off in Settings → General.
+
+## Settings
+
+Right-click the toolbar icon → **Options**, or **Settings…** in the popup's `⋯` menu.
+
+- **General:** refresh interval (1 to 30 minutes), peak hours, and the toolbar badge.
+- **Appearance:** style (Cozy or Classic), theme (System, Dark or Light), accent colour, size,
+  and custom CSS.
+- **Account:** which organization to show, if your account has more than one.
+- **About:** version and a link to this repository.
+
+Settings are stored with `chrome.storage.sync`, so they follow your Chrome profile to your
+other computers. The usage it last read is kept locally and is never synced.
+
+## How it works
+
+| Piece | What it does |
+| --- | --- |
+| `manifest.json` | Manifest V3. Asks only for `storage`, `alarms` and `https://claude.ai/*`. |
+| `background.js` | Service worker: owns the settings, fetches usage from claude.ai, keeps the countdown with `chrome.alarms`, paints the badge. |
+| `popup.html` / `popup.js` / `popup.css` | The panel itself, the same markup and styles as the desktop widget. |
+| `options.html` / `options.js` / `options.css` | The Settings page, the same controls as the desktop Settings window. |
+| `shared/core.js` | A copy of [`src/shared/core.js`](../src/shared/core.js): usage parsing, peak hours, formatting, thresholds. |
+
+The popup is only a view. It asks the service worker for whatever state it already has the
+moment it opens, so it draws instantly even when the worker was asleep, and a refresh runs
+behind it if the numbers are older than one interval.
+
+### Keeping the shared logic in sync
+
+`extension/shared/core.js` is a byte-for-byte copy of `src/shared/core.js`, because an
+extension can only load files inside its own folder. After changing the shared logic:
+
+```bash
+npm run sync:extension
+npm test
+```
+
+`test/extension.test.js` fails if the copy has drifted, if the manifest version doesn't match
+`package.json`, or if a file the manifest or the pages point at is missing.
+
+## Privacy
+
+The extension talks to claude.ai and nothing else, and reads only your organizations and your
+usage. Nothing is sent anywhere, there is no analytics, and the usage it reads stays on your
+computer. See [PRIVACY.md](../PRIVACY.md).
