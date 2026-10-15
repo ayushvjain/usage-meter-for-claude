@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/core.test.js",
+    "test": "node --test test/*.test.js",
     "dist": "electron-builder --win nsis --publish never",
     "sync:extension": "node -e \"require('fs').copyFileSync('src/shared/core.js', 'extension/shared/core.js')\""
   },
