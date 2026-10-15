@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Usage Meter for Claude</title>
+    <link rel="stylesheet" href="popup.css" />
+    <!-- Custom CSS (Settings > Appearance > Custom CSS) loads after the built-in styles. -->
+    <style id="user-theme"></style>
+  </head>
+  <body>
+    <main class="widget" id="widget" data-status="loading">
+      <div class="content" id="content">
+        <header class="header">
+          <div class="heading">
+            <h1 class="title">Claude usage</h1>
+            <span class="org-name" id="org-name" hidden></span>
+          </div>
+          <div class="actions">
+            <button class="icon-btn" id="refresh" type="button" title="Refresh now" aria-label="Refresh now">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                <path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button class="icon-btn" id="menu" type="button" title="Menu" aria-label="Open menu" aria-haspopup="menu" aria-expanded="false">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+                <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+              </svg>
+            </button>
+
+            <!-- The menu the three dots open. Closes on Escape or a click anywhere else. -->
+            <div class="menu" id="menu-popover" role="menu" hidden>
+              <button class="menu-item" type="button" role="menuitem" data-command="refresh">Refresh now</button>
+              <button class="menu-item" type="button" role="menuitem" data-command="settings">Settings…</button>
+              <button class="menu-item" type="button" role="menuitem" data-command="claude">Open claude.ai</button>
+            </div>
+          </div>
+        </header>
+
+        <section class="limits" id="limits" aria-live="polite"></section>
+
+        <section class="notice" id="signin" hidden>
+          <p>Sign in to claude.ai to see your session and weekly limits.</p>
+          <button class="primary-btn" id="signin-btn" type="button">Open claude.ai</button>
+        </section>
+
+        <section class="notice org-picker" id="org-picker" hidden>
+          <p>Your account has more than one organization. Choose the one to show.</p>
+          <div class="org-list" id="org-list" role="list"></div>
+          <p class="org-hint">You can change this later in Settings.</p>
+        </section>
+
+        <section class="notice notice--error" id="error" hidden>
+          <p id="error-text"></p>
+        </section>
+
+        <section class="peak" id="peak" hidden>
+          <div class="peak-row">
+            <span class="peak-dot" aria-hidden="true"></span>
+            <span class="peak-label" id="peak-label"></span>
+            <span class="peak-countdown" id="peak-countdown"></span>
+          </div>
+          <div class="day-strip" id="day-strip" aria-hidden="true">
+            <div class="now-marker" id="now-marker"></div>
+          </div>
+          <div class="strip-scale" aria-hidden="true">
+            <span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>12a</span>
+          </div>
+        </section>
+      </div>
+
+      <footer class="footer" id="footer">
+        <span id="updated"></span>
+        <span id="next"></span>
+      </footer>
+    </main>
+
+    <script src="shared/core.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

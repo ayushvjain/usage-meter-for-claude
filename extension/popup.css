@@ -1,0 +1,646 @@
+/*
+  The popup's styles, shared line for line with the desktop widget's src/renderer/styles.css.
+  Theme, style, accent colour and size come from the extension's Settings page; developers can
+  override anything below with custom CSS (Settings > Appearance > Custom CSS), since every
+  colour and size is a variable.
+
+  Differences from the desktop widget: the popup has a fixed width instead of sizing its own
+  window, its background is opaque (a popup has no wallpaper to show through), and it has no
+  drag handle or resize corner, since the browser places and sizes it.
+*/
+
+/* ---------- Tokens ---------- */
+
+:root {
+  /* Chrome runs on every desktop, so the stack starts with the platform's own UI font. */
+  --font: system-ui, "Segoe UI Variable Text", "Segoe UI", -apple-system, sans-serif;
+  --font-numbers: system-ui, "Segoe UI Variable Display", "Segoe UI", -apple-system, sans-serif;
+
+  /* How wide the popup is. The size setting scales the whole page, so this stays in sync. */
+  --popup-width: 300px;
+  --radius: 14px;
+  --pad: 16px;
+  --hero-size: 34px;
+  --bar-height: 6px;
+  --hero-bar-height: 10px;
+
+  /* The popup sits on the browser's surface, so the panel is opaque. */
+  --bg-alpha: 1;
+
+  /* Accent presets: one shade for dark panels, one for light. */
+  --accent-on-dark: #56c6b0;
+  --accent-on-light: #1a9682;
+}
+
+:root[data-accent="clay"] {
+  --accent-on-dark: #e3895f;
+  --accent-on-light: #c4643f;
+}
+
+:root[data-accent="blue"] {
+  --accent-on-dark: #6aa8ff;
+  --accent-on-light: #2563eb;
+}
+
+:root[data-accent="violet"] {
+  --accent-on-dark: #a796f5;
+  --accent-on-light: #6c58d6;
+}
+
+:root[data-accent="amber"] {
+  --accent-on-dark: #f2b544;
+  --accent-on-light: #b7790a;
+}
+
+:root[data-accent="rose"] {
+  --accent-on-dark: #f48fb1;
+  --accent-on-light: #c2416f;
+}
+
+/* Dark theme (the default, and "System" when Windows is in dark mode). */
+:root {
+  --bg-rgb: 19, 27, 41;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e9eef5;
+  --muted: #8e9bb0;
+  --track: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.08);
+  --ok: var(--accent-on-dark);
+  --warn: #f2b544;
+  --danger: #f07178;
+  --peak: #a796f5;
+  --off-peak: var(--accent-on-dark);
+  --on-accent: #0d1a1c;
+}
+
+/* Light theme: chosen in Settings, or "System" when Windows is in light mode. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-rgb: 247, 249, 252;
+    --border: rgba(16, 28, 48, 0.1);
+    --text: #16202e;
+    --muted: #5b6980;
+    --track: rgba(16, 28, 48, 0.08);
+    --hover: rgba(16, 28, 48, 0.06);
+    --ok: var(--accent-on-light);
+    --warn: #c4860a;
+    --danger: #d2414d;
+    --peak: #6c58d6;
+    --off-peak: var(--accent-on-light);
+    --on-accent: #ffffff;
+  }
+}
+
+:root[data-theme="light"] {
+  --bg-rgb: 247, 249, 252;
+  --border: rgba(16, 28, 48, 0.1);
+  --text: #16202e;
+  --muted: #5b6980;
+  --track: rgba(16, 28, 48, 0.08);
+  --hover: rgba(16, 28, 48, 0.06);
+  --ok: var(--accent-on-light);
+  --warn: #c4860a;
+  --danger: #d2414d;
+  --peak: #6c58d6;
+  --off-peak: var(--accent-on-light);
+  --on-accent: #ffffff;
+}
+
+:root {
+  --bg: rgba(var(--bg-rgb), var(--bg-alpha));
+}
+
+/* ---------- Layout ---------- */
+
+/* Text never wraps, so the widget's height doesn't change with its width; the widget
+   widens to fit its longest line instead. */
+.limit-label,
+.limit-reset,
+.peak-row,
+.footer span {
+  white-space: nowrap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Sections toggled with the hidden attribute must stay hidden whatever display a theme sets. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  font-family: var(--font);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The popup is as wide as its longest line, like the desktop widget, within sensible bounds:
+   never narrower than --popup-width, and never so wide that a long organization name
+   stretches it across the screen. */
+body {
+  width: max-content;
+  min-width: var(--popup-width);
+  max-width: 380px;
+}
+
+/* The panel is the whole popup, so it has no border or corners of its own. */
+.widget {
+  position: relative;
+  padding: var(--pad);
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.footer {
+  margin-top: auto;
+}
+
+/* ---------- Header ---------- */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -6px -4px 0;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Shown only for people with more than one organization. */
+.org-name {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 210px;
+}
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.actions {
+  position: relative;
+  display: flex;
+  gap: 2px;
+}
+
+/* ---------- Menu ---------- */
+
+/* Opened by the three dots, and closed by Escape or a click anywhere else in the popup.
+   Clicking outside the popup closes the popup itself, which the browser handles. */
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 150px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.menu-item {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--hover);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: -2px;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible,
+.primary-btn:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.icon-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.widget[data-status="loading"] #refresh svg {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Limits ---------- */
+
+.limits {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.limits:empty {
+  display: none;
+}
+
+.limit {
+  --level: var(--ok);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  row-gap: 6px;
+}
+
+.limit[data-level="warn"] {
+  --level: var(--warn);
+}
+
+.limit[data-level="danger"] {
+  --level: var(--danger);
+}
+
+.limit-label {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.limit-value {
+  font-family: var(--font-numbers);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.track {
+  grid-column: 1 / -1;
+  height: var(--bar-height);
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  width: var(--p, 0%);
+  border-radius: inherit;
+  background: var(--level);
+  transition: width 0.5s ease;
+}
+
+.limit-reset {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The 5-hour session is the number people check most, so it gets the large treatment. */
+.limit--hero {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* With only a session limit there is nothing below it to separate. */
+.limit--hero:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.limit--hero .limit-value {
+  font-size: var(--hero-size);
+  line-height: 1;
+  color: var(--level);
+  letter-spacing: -0.02em;
+}
+
+.limit--hero .limit-value small {
+  font-size: 0.5em;
+  font-weight: 500;
+  margin-left: 1px;
+}
+
+.limit--hero .track {
+  height: var(--hero-bar-height);
+}
+
+/* ---------- Notices ---------- */
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Sentences wrap at the popup's base width instead of stretching it to its maximum. */
+.notice p {
+  margin: 0;
+  max-width: calc(var(--popup-width) - 2 * var(--pad));
+  white-space: normal;
+}
+
+.notice--error p {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.primary-btn {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font: inherit;
+  font-weight: 600;
+  background: var(--ok);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  filter: brightness(1.08);
+}
+
+.primary-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ---------- Organization picker ---------- */
+
+.org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.org-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.org-option:hover {
+  background: var(--hover);
+}
+
+.org-option:focus-visible {
+  outline: 2px solid var(--ok);
+  outline-offset: 2px;
+}
+
+.org-option-name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.org-option-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.org-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- Peak hours ---------- */
+
+.peak {
+  --state: var(--off-peak);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.peak[data-state="peak"] {
+  --state: var(--peak);
+}
+
+.peak-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.peak-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--state);
+  flex: none;
+}
+
+.peak-label {
+  font-weight: 500;
+}
+
+.peak-countdown {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-strip {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.day-strip .segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--peak);
+  opacity: 0.75;
+}
+
+.now-marker {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--text);
+}
+
+.strip-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget[data-status="loading"] #refresh svg {
+    animation: none;
+  }
+  .fill {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Cozy style (Settings > Appearance > Style)
+   Warm paper colours, a serif title and percentages, and a simpler layout. Everything
+   else, including the footer, uses the same font as the Classic style.
+   Everything above still applies; this only overrides it.
+   ========================================================================== */
+
+:root[data-style="cozy"] {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --font-numbers: var(--font-serif);
+  --radius: 18px;
+  --hero-size: 40px;
+  --hero-bar-height: 10px;
+  --bar-height: 6px;
+
+  /* Warm dark: a cup of coffee at night. */
+  --bg-rgb: 41, 37, 33;
+  --border: rgba(242, 236, 227, 0.12);
+  --text: #f2ece3;
+  --muted: #b5aa9b;
+  --track: rgba(242, 236, 227, 0.1);
+  --hover: rgba(242, 236, 227, 0.08);
+  --warn: #e0a84e;
+  --danger: #e06a52;
+  --peak: #e0a84e;
+  --on-accent: #2a1f18;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-style="cozy"]:not([data-theme="dark"]) {
+    --bg-rgb: 250, 246, 239;
+    --border: rgba(59, 50, 42, 0.14);
+    --text: #3b322a;
+    --muted: #857565;
+    --track: rgba(59, 50, 42, 0.09);
+    --hover: rgba(59, 50, 42, 0.06);
+    --warn: #b8801c;
+    --danger: #b84a33;
+    --peak: #b8801c;
+    --on-accent: #fffaf3;
+  }
+}
+
+/* Warm light: paper. */
+:root[data-style="cozy"][data-theme="light"] {
+  --bg-rgb: 250, 246, 239;
+  --border: rgba(59, 50, 42, 0.14);
+  --text: #3b322a;
+  --muted: #857565;
+  --track: rgba(59, 50, 42, 0.09);
+  --hover: rgba(59, 50, 42, 0.06);
+  --warn: #b8801c;
+  --danger: #b84a33;
+  --peak: #b8801c;
+  --on-accent: #fffaf3;
+}
+
+[data-style="cozy"] .title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+[data-style="cozy"] .limit-label {
+  font-weight: 500;
+}
+
+[data-style="cozy"] .limit--hero .limit-value {
+  letter-spacing: 0;
+}
+
+/* Simpler: peak hours is one line, without the 24-hour strip. */
+[data-style="cozy"] .day-strip,
+[data-style="cozy"] .strip-scale {
+  display: none;
+}
+
+[data-style="cozy"] .primary-btn {
+  border-radius: 999px;
+  padding: 8px 18px;
+}
