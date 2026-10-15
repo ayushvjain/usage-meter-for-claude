@@ -23,6 +23,10 @@
   "background": {
     "service_worker": "background.js"
   },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "permissions": ["storage", "alarms"],
   "host_permissions": ["https://claude.ai/*"]
 }

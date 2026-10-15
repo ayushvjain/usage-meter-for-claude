@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Settings · Usage Meter for Claude</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        <button class="nav-item" role="tab" id="tab-general" aria-controls="panel-general" aria-selected="true" type="button">General</button>
+        <button class="nav-item" role="tab" id="tab-appearance" aria-controls="panel-appearance" aria-selected="false" tabindex="-1" type="button">Appearance</button>
+        <button class="nav-item" role="tab" id="tab-account" aria-controls="panel-account" aria-selected="false" tabindex="-1" type="button">Account</button>
+        <button class="nav-item" role="tab" id="tab-about" aria-controls="panel-about" aria-selected="false" tabindex="-1" type="button">About</button>
+      </nav>
+
+      <main class="panels">
+        <!-- General -->
+        <section class="panel" role="tabpanel" id="panel-general" aria-labelledby="tab-general">
+          <h1>General</h1>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="refresh-minutes">Refresh every</label>
+              <p>How often your usage is checked in the background. Refreshing by hand restarts the countdown.</p>
+            </div>
+            <select id="refresh-minutes"></select>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="show-peak">Show peak hours</label>
+              <p>Weekdays 13:00 to 19:00 UTC, shown in your local time.</p>
+            </div>
+            <input class="switch" type="checkbox" role="switch" id="show-peak" />
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <label for="show-badge">Show the percentage on the toolbar icon</label>
+              <p>Your session usage as a small badge, so you can see it without opening the popup.</p>
+            </div>
+            <input class="switch" type="checkbox" role="switch" id="show-badge" />
+          </div>
+        </section>
+
+        <!-- Appearance -->
+        <section class="panel" role="tabpanel" id="panel-appearance" aria-labelledby="tab-appearance" hidden>
+          <h1>Appearance</h1>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="style-label">Style</span>
+              <p>Cozy uses warm colours and serif numbers. Classic is the original cool look.</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="style-label" id="style">
+              <button type="button" role="radio" data-value="cozy">Cozy</button>
+              <button type="button" role="radio" data-value="classic">Classic</button>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="theme-label">Theme</span>
+              <p>System follows your computer's light or dark mode.</p>
+            </div>
+            <div class="segmented" role="radiogroup" aria-labelledby="theme-label" id="theme">
+              <button type="button" role="radio" data-value="system">System</button>
+              <button type="button" role="radio" data-value="dark">Dark</button>
+              <button type="button" role="radio" data-value="light">Light</button>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <span class="label" id="accent-label">Accent colour</span>
+              <p>Used for the usage bars and buttons. Bars still turn amber and red as you near a limit.</p>
+            </div>
+            <div class="swatches" role="radiogroup" aria-labelledby="accent-label" id="accent"></div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <label for="scale">Size</label>
+              <p>Make the popup bigger or smaller. 100% matches the desktop widget.</p>
+            </div>
+            <div class="range">
+              <input type="range" id="scale" />
+              <output id="scale-value" for="scale"></output>
+              <button class="btn" type="button" id="scale-reset">Reset</button>
+            </div>
+          </div>
+
+          <div class="row row--stack">
+            <div class="row-text">
+              <label for="custom-css">Custom CSS</label>
+              <p>For developers: restyle anything in the popup. It is applied after the built-in styles.</p>
+            </div>
+            <textarea class="code" id="custom-css" spellcheck="false" placeholder=":root { --hero-size: 48px; }"></textarea>
+            <span class="saved" id="css-saved"></span>
+          </div>
+        </section>
+
+        <!-- Account -->
+        <section class="panel" role="tabpanel" id="panel-account" aria-labelledby="tab-account" hidden>
+          <h1>Account</h1>
+
+          <div class="card" id="account-card">
+            <span class="status-dot" id="account-dot" aria-hidden="true"></span>
+            <div class="card-text">
+              <p class="card-title" id="account-title"></p>
+              <p class="card-sub" id="account-sub"></p>
+            </div>
+            <button class="btn btn--primary" type="button" id="open-claude">Open claude.ai</button>
+          </div>
+
+          <div class="row row--stack" id="org-row" hidden>
+            <div class="row-text">
+              <label for="org">Organization</label>
+              <p>Your account belongs to more than one. The popup shows the one you pick.</p>
+            </div>
+            <select id="org"></select>
+          </div>
+
+          <p class="fine-print">
+            The extension uses the claude.ai session already in this browser, so there is no separate
+            sign-in: sign in or out on claude.ai itself. It only ever talks to claude.ai, and your usage
+            is kept on this computer.
+          </p>
+        </section>
+
+        <!-- About -->
+        <section class="panel" role="tabpanel" id="panel-about" aria-labelledby="tab-about" hidden>
+          <h1>About</h1>
+
+          <div class="about">
+            <img class="about-icon" src="icons/icon-128.png" alt="" width="56" height="56" />
+            <div>
+              <p class="about-name">Usage Meter for Claude</p>
+              <p class="card-sub" id="version"></p>
+            </div>
+          </div>
+
+          <p>A free, open-source extension that shows your Claude session and weekly usage, reset times, and peak hours in one click.</p>
+          <p class="fine-print">Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthropic.</p>
+
+          <div class="row">
+            <div class="row-text">
+              <span class="label">Source code</span>
+              <p>Report a problem, suggest a feature, or contribute on GitHub.</p>
+            </div>
+            <a class="btn" id="repo" href="https://github.com/ayushvjain/usage-meter-for-claude" target="_blank" rel="noreferrer">Open GitHub</a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="shared/core.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
