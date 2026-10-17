@@ -71,6 +71,7 @@
   --peak: #a796f5;
   --off-peak: var(--accent-on-dark);
   --on-accent: #0d1a1c;
+  color-scheme: dark;
 }
 
 /* Light theme: chosen in Settings, or "System" when Windows is in light mode. */
@@ -88,6 +89,7 @@
     --peak: #6c58d6;
     --off-peak: var(--accent-on-light);
     --on-accent: #ffffff;
+    color-scheme: light;
   }
 }
 
@@ -104,6 +106,7 @@
   --peak: #6c58d6;
   --off-peak: var(--accent-on-light);
   --on-accent: #ffffff;
+  color-scheme: light;
 }
 
 :root {
@@ -130,10 +133,16 @@
   display: none !important;
 }
 
-html,
+/* Transparent, so the panel's own background doesn't propagate to the popup's canvas and
+   square off the corners rounded below. What shows through is the browser's own popup
+   backdrop, which follows color-scheme. */
+html {
+  background: transparent;
+}
+
 body {
   margin: 0;
-  background: var(--bg);
+  background: transparent;
   font-family: var(--font);
   color: var(--text);
   font-size: 13px;
@@ -151,9 +160,14 @@ body {
   max-width: 380px;
 }
 
-/* The panel is the whole popup, so it has no border or corners of its own. */
+/* The panel is the whole popup, and rounds the popup's corners with it. Chrome draws the
+   popup square on some platforms and versions; where it rounds the popup itself, its radius
+   simply hides this one. The clipping lives here rather than on body, whose overflow would
+   propagate to the viewport instead of clipping anything. */
 .widget {
   position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
   padding: var(--pad);
   color: var(--text);
   background: var(--bg);
