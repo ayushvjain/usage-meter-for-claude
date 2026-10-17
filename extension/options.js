@@ -96,6 +96,7 @@
     $('show-peak').addEventListener('change', (e) => setSetting('showPeakHours', e.target.checked));
     $('show-badge').addEventListener('change', (e) => setSetting('showBadge', e.target.checked));
     $('track-free').addEventListener('change', (e) => setSetting('trackFreeUsage', e.target.checked));
+    $('show-strip').addEventListener('change', (e) => setSetting('showStrip', e.target.checked));
 
     bindRadioGroup($('style'), 'style');
     bindRadioGroup($('theme'), 'theme');
@@ -186,6 +187,31 @@
     }
   }
 
+  /* What the page reader has actually seen. Without this, an account whose replies the
+     reader can't read looks exactly like one that hasn't been used yet. */
+  function renderReaderStatus(state, settings) {
+    const el = $('reader-status');
+    const reader = state.reader || {};
+    if (!settings.trackFreeUsage) {
+      el.textContent = '';
+      return;
+    }
+    if (reader.error) {
+      el.textContent = `The reader couldn't start: ${reader.error}`;
+      return;
+    }
+    const seen = (reader.completions || 0) + (reader.timelines || 0);
+    if (reader.readings) {
+      el.textContent = `Reader on. ${reader.readings} reading${reader.readings === 1 ? '' : 's'} so far, last at ${new Date(reader.lastAt).toLocaleTimeString()}.`;
+    } else if (reader.timelines) {
+      el.textContent = `Reader on, and it has seen ${reader.timelines} chat request${reader.timelines === 1 ? '' : 's'} — but on claude.ai's newer transport, which it can't read yet.`;
+    } else if (seen) {
+      el.textContent = `Reader on, ${seen} chat request${seen === 1 ? '' : 's'} seen, none carrying usage yet.`;
+    } else {
+      el.textContent = 'Reader on. Nothing seen yet — send a message on claude.ai in a tab opened since you turned this on.';
+    }
+  }
+
   function render(payload) {
     if (!payload || payload.error) return;
     const { state, settings } = payload;
@@ -196,6 +222,8 @@
     $('show-peak').checked = settings.showPeakHours;
     $('show-badge').checked = settings.showBadge;
     $('track-free').checked = settings.trackFreeUsage;
+    $('show-strip').checked = settings.showStrip;
+    renderReaderStatus(state, settings);
 
     setChecked($('style'), settings.style);
     setChecked($('theme'), settings.theme);

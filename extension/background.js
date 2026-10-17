@@ -27,6 +27,8 @@ const STREAM_KEY = 'streamUsage';
 // The page reader, registered only while the setting is on. Two halves: one in the page's
 // own world, where fetch can be wrapped, and one in ours, which can reach the worker.
 const READER_ID = 'claude-page-reader';
+const STRIP_ID = 'claude-usage-strip';
+const READER_STATS_KEY = 'readerStats';
 
 const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: core.DEFAULT_REFRESH_MINUTES,
@@ -37,6 +39,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   scale: 1,
   showBadge: true,
   trackFreeUsage: false, // read Free-plan usage from claude.ai itself (see claude-page.js)
+  showStrip: false, // show the figures on claude.ai itself (see claude-strip.js)
   warnAt: 60,
   dangerAt: 85,
   orgId: null,
@@ -57,6 +60,9 @@ const EMPTY_STATE = Object.freeze({
   unmetered: false,
   // 'usage' for the figures claude.ai reports, 'stream' for ones read from the chat itself.
   source: 'usage',
+  // What the page reader has seen, so the UI can tell "no reply yet" from "replies this
+  // cannot read" instead of waiting forever on either.
+  reader: { completions: 0, timelines: 0, readings: 0, lastAt: null, error: null },
 });
 
 /* ---------- Settings ---------- */
@@ -67,6 +73,7 @@ function cleanSettings(input) {
   s.showPeakHours = Boolean(s.showPeakHours);
   s.showBadge = Boolean(s.showBadge);
   s.trackFreeUsage = Boolean(s.trackFreeUsage);
+  s.showStrip = Boolean(s.showStrip);
   s.style = core.STYLES.includes(s.style) ? s.style : DEFAULT_SETTINGS.style;
   s.theme = core.THEMES.includes(s.theme) ? s.theme : DEFAULT_SETTINGS.theme;
   s.accent = core.ACCENTS.includes(s.accent) ? s.accent : DEFAULT_SETTINGS.accent;
@@ -100,7 +107,7 @@ async function saveState(state) {
 
 /** Saves the state, tells any open popup about it, and updates the toolbar badge. */
 async function setState(patch) {
-  const next = { ...(await loadState()), ...patch };
+  const next = { ...(await loadState()), ...patch, reader: await getReaderStats() };
   await saveState(next);
   const settings = await loadSettings();
   await paintBadge(next, settings);
@@ -158,14 +165,31 @@ async function saveStreamLimits(orgId, limits) {
   await chrome.storage.local.set({ [STREAM_KEY]: next });
 }
 
-/** Turns the page reader on or off to match the setting, without disturbing a live one. */
+async function getReaderStats() {
+  const stored = await chrome.storage.local.get(READER_STATS_KEY);
+  return { completions: 0, timelines: 0, readings: 0, lastAt: null, error: null, ...(stored[READER_STATS_KEY] || {}) };
+}
+
+async function bumpReaderStats(patch) {
+  const stats = { ...(await getReaderStats()), ...patch };
+  await chrome.storage.local.set({ [READER_STATS_KEY]: stats });
+  return stats;
+}
+
+/** Turns the page scripts on or off to match the settings, without disturbing a live one. */
 async function syncReader() {
   const settings = await loadSettings();
-  const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [READER_ID] }).catch(() => []);
-  const on = registered.length > 0;
-  if (settings.trackFreeUsage === on) return;
+  const wanted = [];
+  if (settings.showStrip) {
+    wanted.push({
+      id: STRIP_ID,
+      matches: ['https://claude.ai/*'],
+      js: ['claude-strip.js'],
+      runAt: 'document_idle',
+    });
+  }
   if (settings.trackFreeUsage) {
-    await chrome.scripting.registerContentScripts([
+    wanted.push(
       {
         id: READER_ID,
         matches: ['https://claude.ai/*'],
@@ -179,9 +203,22 @@ async function syncReader() {
         runAt: 'document_start',
         world: 'MAIN',
       },
-    ]).catch(() => {});
-  } else {
-    await chrome.scripting.unregisterContentScripts({ ids: [READER_ID, `${READER_ID}-page`] }).catch(() => {});
+    );
+  }
+
+  try {
+    const registered = await chrome.scripting.getRegisteredContentScripts();
+    const have = new Set(registered.map((script) => script.id));
+    const want = new Set(wanted.map((script) => script.id));
+    const stale = [...have].filter((id) => !want.has(id) && (id === STRIP_ID || id.startsWith(READER_ID)));
+    if (stale.length) await chrome.scripting.unregisterContentScripts({ ids: stale });
+    const missing = wanted.filter((script) => !have.has(script.id));
+    if (missing.length) await chrome.scripting.registerContentScripts(missing);
+    await bumpReaderStats({ error: null });
+  } catch (err) {
+    // Registration failing silently is the worst outcome: the UI would wait forever for a
+    // reader that was never there. Keep the reason so Settings can show it.
+    await bumpReaderStats({ error: String((err && err.message) || err) });
   }
 }
 
@@ -397,9 +434,9 @@ const handlers = {
     const settings = cleanSettings({ ...(await loadSettings()), [key]: value });
     await saveSettings(settings);
     if (key === 'refreshMinutes') await scheduleNext();
-    if (key === 'trackFreeUsage') {
+    if (key === 'trackFreeUsage' || key === 'showStrip') {
       await syncReader();
-      await runRefresh(); // pick up or drop the stream readings straight away
+      if (key === 'trackFreeUsage') await runRefresh(); // pick up or drop stream readings at once
     }
     if (key === 'orgId') {
       orgCache = null;
@@ -418,11 +455,22 @@ const handlers = {
   /* A reply just arrived in a claude.ai tab and carried usage with it. Sent by
      claude-bridge.js, so the numbers come from a web page: they are parsed and merged here
      the same way whatever their shape, and reach the popup only as ordinary limits. */
+  /* The reader noticed a chat request. Counted, so Settings and the strip can say whether
+     it is seeing anything at all, and whether what it sees is readable. */
+  async sawChat({ kind }) {
+    const stats = await getReaderStats();
+    if (kind === 'timeline') await bumpReaderStats({ timelines: stats.timelines + 1 });
+    else await bumpReaderStats({ completions: stats.completions + 1 });
+    return { ok: true };
+  },
+
   async streamUsage({ windows, orgId }) {
     const settings = await loadSettings();
     if (!settings.trackFreeUsage) return { ok: false };
     const limits = core.parseStreamWindows(windows);
     if (!limits.length) return { ok: false };
+    const stats = await getReaderStats();
+    await bumpReaderStats({ readings: stats.readings + 1, lastAt: Date.now() });
     const state = await loadState();
     const org = orgId || (state.org && state.org.uuid) || null;
     const merged = core.mergeStreamLimits(await getStreamLimits(org), limits);

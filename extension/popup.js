@@ -205,9 +205,20 @@
     els.sourceNote.hidden = !(haveNumbers && state.source === 'stream');
 
     if (els.free.hidden) return;
-    els.freeText.textContent = tracking
-      ? 'Waiting for your next message on claude.ai. Free plans report usage only as a reply arrives.'
-      : 'claude.ai reports no usage figures for Free plans. They can be read from your chats instead, as each reply arrives.';
+    const reader = state.reader || {};
+    if (!tracking) {
+      els.freeText.textContent =
+        'claude.ai reports no usage figures for Free plans. They can be read from your chats instead, as each reply arrives.';
+    } else if (reader.timelines && !reader.readings) {
+      // The reader is working; this account's replies simply aren't in a form it can read.
+      els.freeText.textContent =
+        "This account's chats use claude.ai's newer transport, which sends usage in a form the extension can't read yet. Nothing to do on your side.";
+    } else if (reader.error) {
+      els.freeText.textContent = `The page reader couldn't start: ${reader.error}`;
+    } else {
+      els.freeText.textContent =
+        'Waiting for your next message on claude.ai. Free plans report usage only as a reply arrives.';
+    }
   }
 
   function renderDayStrip(now) {
@@ -317,12 +328,13 @@
   }
 
   els.refresh.addEventListener('click', refresh);
-  els.freeBtn.addEventListener('click', () => {
+  // One button, both halves: read the usage, and put it on the page where it is useful.
+  els.freeBtn.addEventListener('click', async () => {
     els.freeBtn.disabled = true;
-    send('setSetting', { key: 'trackFreeUsage', value: true }).then((payload) => {
-      els.freeBtn.disabled = false;
-      apply(payload);
-    });
+    await send('setSetting', { key: 'showStrip', value: true });
+    const payload = await send('setSetting', { key: 'trackFreeUsage', value: true });
+    els.freeBtn.disabled = false;
+    apply(payload);
   });
   els.signinBtn.addEventListener('click', () => send('openClaude').then(() => window.close()));
 
