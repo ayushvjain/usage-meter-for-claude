@@ -34,6 +34,10 @@
     orgName: $('org-name'),
     orgPicker: $('org-picker'),
     orgList: $('org-list'),
+    free: $('free'),
+    freeText: $('free-text'),
+    freeBtn: $('free-btn'),
+    sourceNote: $('source-note'),
     userTheme: $('user-theme'),
   };
 
@@ -115,7 +119,7 @@
     els.limits.replaceChildren();
     state.limits.forEach((limit) => els.limits.append(buildLimit(limit, settings)));
 
-    if (state.status === 'ok' && state.limits.length === 0) {
+    if (state.status === 'ok' && state.limits.length === 0 && !state.unmetered) {
       const empty = document.createElement('p');
       empty.className = 'limit-reset';
       empty.textContent = 'claude.ai reported no usage limits for this account.';
@@ -172,6 +176,7 @@
         : state.message
       : '';
 
+    renderFree();
     els.peak.hidden = !(settings && settings.showPeakHours);
 
     const showOrg = state.orgCount > 1 && state.org && state.org.name;
@@ -181,6 +186,28 @@
 
     renderLimits();
     tick();
+  }
+
+  /*
+   * What a Free plan sees. claude.ai answers the usage endpoint for these accounts but puts
+   * nothing in it, so the only figures that exist are the ones the page reader hears as a
+   * reply arrives. Three cases: the reader is off and can be turned on; it is on but no
+   * reply has come yet; or there are numbers, drawn as ordinary limits with a note saying
+   * where they came from.
+   */
+  function renderFree() {
+    const unmetered = Boolean(state.unmetered);
+    const tracking = Boolean(settings && settings.trackFreeUsage);
+    const haveNumbers = state.limits.length > 0;
+
+    els.free.hidden = !unmetered || haveNumbers;
+    els.freeBtn.hidden = tracking;
+    els.sourceNote.hidden = !(haveNumbers && state.source === 'stream');
+
+    if (els.free.hidden) return;
+    els.freeText.textContent = tracking
+      ? 'Waiting for your next message on claude.ai. Free plans report usage only as a reply arrives.'
+      : 'claude.ai reports no usage figures for Free plans. They can be read from your chats instead, as each reply arrives.';
   }
 
   function renderDayStrip(now) {
@@ -290,6 +317,13 @@
   }
 
   els.refresh.addEventListener('click', refresh);
+  els.freeBtn.addEventListener('click', () => {
+    els.freeBtn.disabled = true;
+    send('setSetting', { key: 'trackFreeUsage', value: true }).then((payload) => {
+      els.freeBtn.disabled = false;
+      apply(payload);
+    });
+  });
   els.signinBtn.addEventListener('click', () => send('openClaude').then(() => window.close()));
 
   // Updates pushed by the background worker while the popup is open.

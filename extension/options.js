@@ -95,6 +95,7 @@
 
     $('show-peak').addEventListener('change', (e) => setSetting('showPeakHours', e.target.checked));
     $('show-badge').addEventListener('change', (e) => setSetting('showBadge', e.target.checked));
+    $('track-free').addEventListener('change', (e) => setSetting('trackFreeUsage', e.target.checked));
 
     bindRadioGroup($('style'), 'style');
     bindRadioGroup($('theme'), 'theme');
@@ -194,6 +195,7 @@
     $('refresh-minutes').value = String(settings.refreshMinutes);
     $('show-peak').checked = settings.showPeakHours;
     $('show-badge').checked = settings.showBadge;
+    $('track-free').checked = settings.trackFreeUsage;
 
     setChecked($('style'), settings.style);
     setChecked($('theme'), settings.theme);

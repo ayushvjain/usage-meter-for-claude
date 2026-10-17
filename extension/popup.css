@@ -394,6 +394,15 @@ body {
   height: var(--hero-bar-height);
 }
 
+/* A line under the limits saying where they came from, when it isn't claude.ai's own report. */
+.source-note {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  max-width: calc(var(--popup-width) - 2 * var(--pad));
+  white-space: normal;
+}
+
 /* ---------- Notices ---------- */
 
 .notice {

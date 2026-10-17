@@ -27,8 +27,16 @@ test('the manifest version matches package.json', () => {
 });
 
 test('the manifest only asks for the permissions it uses', () => {
-  assert.deepStrictEqual(manifest.permissions, ['storage', 'alarms']);
+  assert.deepStrictEqual(manifest.permissions, ['storage', 'alarms', 'scripting']);
   assert.deepStrictEqual(manifest.host_permissions, ['https://claude.ai/*']);
+});
+
+test('the page reader ships with the extension', () => {
+  for (const file of ['claude-page.js', 'claude-bridge.js']) {
+    assert.ok(fs.existsSync(path.join(extension, file)), `missing ${file}`);
+  }
+  // Registered at runtime, only while the setting is on, so the manifest must not run it.
+  assert.ok(!manifest.content_scripts, 'the reader must not be a static content script');
 });
 
 test('every file the manifest points at exists', () => {

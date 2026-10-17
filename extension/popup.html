@@ -41,6 +41,8 @@
 
         <section class="limits" id="limits" aria-live="polite"></section>
 
+        <p class="source-note" id="source-note" hidden>Read from your last message on claude.ai.</p>
+
         <section class="notice" id="signin" hidden>
           <p>Sign in to claude.ai to see your session and weekly limits.</p>
           <button class="primary-btn" id="signin-btn" type="button">Open claude.ai</button>
@@ -50,6 +52,13 @@
           <p>Your account has more than one organization. Choose the one to show.</p>
           <div class="org-list" id="org-list" role="list"></div>
           <p class="org-hint">You can change this later in Settings.</p>
+        </section>
+
+        <!-- Free plans: claude.ai answers with no figures, so the only usage that exists is
+             what the page reader hears in the chat stream. -->
+        <section class="notice" id="free" hidden>
+          <p id="free-text"></p>
+          <button class="primary-btn" id="free-btn" type="button" hidden>Read usage from claude.ai</button>
         </section>
 
         <section class="notice notice--error" id="error" hidden>
