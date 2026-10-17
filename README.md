@@ -42,6 +42,8 @@ The same meter, in your browser toolbar: click the icon and the panel drops down
   <img src="docs/chrome-popup-light.png" width="280" alt="Chrome popup in light mode" />
 </p>
 
+It can also show usage on the **Free plan**, which the desktop widget can't: claude.ai reports no figures for Free accounts, so the extension reads them from your chats as each reply arrives. That's off by default — turn it on in Settings, or from the popup itself.
+
 It isn't in the Chrome Web Store yet: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose this repository's `extension` folder. See [docs/chrome-extension.md](docs/chrome-extension.md) for the details.
 
 ## Getting started

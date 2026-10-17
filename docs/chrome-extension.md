@@ -40,11 +40,41 @@ Exactly what the widget shows, in the same layout:
 The toolbar icon also carries your session percentage as a badge, so you can see it without
 opening the popup. Turn it off in Settings → General.
 
+## Free plans
+
+claude.ai answers the usage endpoint for a Free account, but puts nothing in it: every
+bucket null and an empty list. That is not a permissions problem and no amount of polling
+will produce a number — on Free there is simply nothing behind that endpoint.
+
+The figures do exist, in the chat itself. Each reply carries a `message_limit` event with a
+`windows` map holding the 5-hour and weekly utilization and their reset times, and claude.ai
+keeps sending it on Free. Reading it means watching a reply arrive, so **Settings → General →
+Read Free plan usage from claude.ai** registers a small reader in your claude.ai tabs. It is
+off by default, and Pro, Max, Team and Enterprise accounts never need it.
+
+What that reader does, and doesn't:
+
+- It wraps `fetch` on the page and reads a *clone* of the reply, so claude.ai consumes its
+  own stream exactly as it would have. It changes no request, no response and nothing on the
+  page, and sends only the usage numbers to the extension.
+- It is registered at runtime, so turning the setting off removes it from the page rather
+  than leaving it there idle.
+- Usage appears after your next message, not before. A fresh install shows nothing until you
+  chat, and the numbers are as fresh as your last reply — the popup says so under the bars.
+- The last reading is kept per organization and survives restarts, so the popup has
+  something to show when you open it.
+
+Two known gaps. Accounts served by claude.ai's newer binary chat transport never make the
+request this reads, so they will see nothing. And the desktop widget cannot do any of this:
+there is no claude.ai page for it to watch, so Free support is the one thing the extension
+has and the widget does not.
+
 ## Settings
 
 Right-click the toolbar icon → **Options**, or **Settings…** in the popup's `⋯` menu.
 
-- **General:** refresh interval (1 to 30 minutes), peak hours, and the toolbar badge.
+- **General:** refresh interval (1 to 30 minutes), peak hours, the toolbar badge, and
+  reading Free plan usage from claude.ai (see above).
 - **Appearance:** style (Cozy or Classic), theme (System, Dark or Light), accent colour, size,
   and custom CSS.
 - **Account:** which organization to show, if your account has more than one.
@@ -57,8 +87,9 @@ other computers. The usage it last read is kept locally and is never synced.
 
 | Piece | What it does |
 | --- | --- |
-| `manifest.json` | Manifest V3. Asks only for `storage`, `alarms` and `https://claude.ai/*`. |
-| `background.js` | Service worker: owns the settings, fetches usage from claude.ai, keeps the countdown with `chrome.alarms`, paints the badge. |
+| `manifest.json` | Manifest V3. Asks only for `storage`, `alarms`, `scripting` and `https://claude.ai/*`. |
+| `background.js` | Service worker: owns the settings, fetches usage from claude.ai, keeps the countdown with `chrome.alarms`, paints the badge, and keeps what the page reader hears. |
+| `claude-page.js` / `claude-bridge.js` | The Free plan reader, registered only while that setting is on: one half in the page's world to read the reply stream, one in ours to carry the numbers back. |
 | `popup.html` / `popup.js` / `popup.css` | The panel itself, the same markup and styles as the desktop widget. |
 | `options.html` / `options.js` / `options.css` | The Settings page, the same controls as the desktop Settings window. |
 | `shared/core.js` | A copy of [`src/shared/core.js`](../src/shared/core.js): usage parsing, peak hours, formatting, thresholds. |
