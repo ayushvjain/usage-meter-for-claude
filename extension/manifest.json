@@ -27,6 +27,6 @@
     "page": "options.html",
     "open_in_tab": true
   },
-  "permissions": ["storage", "alarms"],
+  "permissions": ["storage", "alarms", "scripting"],
   "host_permissions": ["https://claude.ai/*"]
 }

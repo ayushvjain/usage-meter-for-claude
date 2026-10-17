@@ -23,6 +23,10 @@ const ORG_LIST_TTL_MS = 30 * 60 * 1000;
 const ALARM = 'refresh';
 const SETTINGS_KEY = 'settings';
 const STATE_KEY = 'state';
+const STREAM_KEY = 'streamUsage';
+// The page reader, registered only while the setting is on. Two halves: one in the page's
+// own world, where fetch can be wrapped, and one in ours, which can reach the worker.
+const READER_ID = 'claude-page-reader';
 
 const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: core.DEFAULT_REFRESH_MINUTES,
@@ -32,6 +36,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   accent: 'clay',
   scale: 1,
   showBadge: true,
+  trackFreeUsage: false, // read Free-plan usage from claude.ai itself (see claude-page.js)
   warnAt: 60,
   dangerAt: 85,
   orgId: null,
@@ -48,6 +53,10 @@ const EMPTY_STATE = Object.freeze({
   orgCount: 0,
   orgChoices: [],
   orgs: [],
+  // claude.ai answers /usage for this account but puts nothing in it (a Free plan).
+  unmetered: false,
+  // 'usage' for the figures claude.ai reports, 'stream' for ones read from the chat itself.
+  source: 'usage',
 });
 
 /* ---------- Settings ---------- */
@@ -57,6 +66,7 @@ function cleanSettings(input) {
   s.refreshMinutes = core.clampRefreshMinutes(s.refreshMinutes);
   s.showPeakHours = Boolean(s.showPeakHours);
   s.showBadge = Boolean(s.showBadge);
+  s.trackFreeUsage = Boolean(s.trackFreeUsage);
   s.style = core.STYLES.includes(s.style) ? s.style : DEFAULT_SETTINGS.style;
   s.theme = core.THEMES.includes(s.theme) ? s.theme : DEFAULT_SETTINGS.theme;
   s.accent = core.ACCENTS.includes(s.accent) ? s.accent : DEFAULT_SETTINGS.accent;
@@ -112,6 +122,67 @@ async function paintBadge(state, settings) {
   const level = core.levelFor(session.percent, settings);
   await chrome.action.setBadgeText({ text: String(Math.round(session.percent)) });
   await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOURS[level] });
+}
+
+/* ---------- Usage read from the chat stream (Free accounts) ---------- */
+
+/*
+ * On a Free plan the chat stream is the only place usage is ever reported, so this is not a
+ * cache of something refetchable: lose it and nothing but another message brings it back.
+ * It is kept per organization, so a reading can never be shown for the wrong account, and
+ * it survives restarts, which is what lets the popup show something before the next message.
+ */
+
+async function getStreamStore() {
+  const stored = await chrome.storage.local.get(STREAM_KEY);
+  return stored[STREAM_KEY] && typeof stored[STREAM_KEY] === 'object' ? stored[STREAM_KEY] : {};
+}
+
+/** This organization's readings, with any window whose reset has passed dropped. */
+async function getStreamLimits(orgId) {
+  if (!orgId) return [];
+  const store = await getStreamStore();
+  return core.mergeStreamLimits(store[orgId] || [], []);
+}
+
+async function saveStreamLimits(orgId, limits) {
+  const store = await getStreamStore();
+  // Forget organizations whose readings have all expired, so the store can't grow forever.
+  const next = {};
+  for (const [id, entry] of Object.entries(store)) {
+    const live = core.mergeStreamLimits(entry, []);
+    if (live.length) next[id] = live;
+  }
+  if (limits.length) next[orgId] = limits;
+  else delete next[orgId];
+  await chrome.storage.local.set({ [STREAM_KEY]: next });
+}
+
+/** Turns the page reader on or off to match the setting, without disturbing a live one. */
+async function syncReader() {
+  const settings = await loadSettings();
+  const registered = await chrome.scripting.getRegisteredContentScripts({ ids: [READER_ID] }).catch(() => []);
+  const on = registered.length > 0;
+  if (settings.trackFreeUsage === on) return;
+  if (settings.trackFreeUsage) {
+    await chrome.scripting.registerContentScripts([
+      {
+        id: READER_ID,
+        matches: ['https://claude.ai/*'],
+        js: ['claude-bridge.js'],
+        runAt: 'document_start',
+      },
+      {
+        id: `${READER_ID}-page`,
+        matches: ['https://claude.ai/*'],
+        js: ['claude-page.js'],
+        runAt: 'document_start',
+        world: 'MAIN',
+      },
+    ]).catch(() => {});
+  } else {
+    await chrome.scripting.unregisterContentScripts({ ids: [READER_ID, `${READER_ID}-page`] }).catch(() => {});
+  }
 }
 
 /* ---------- claude.ai ---------- */
@@ -235,15 +306,24 @@ async function runRefresh() {
           orgs: result.orgs.map((o) => ({ uuid: o.uuid, name: o.name })),
         });
       } else {
+        const orgId = result.org ? result.org.uuid : null;
+        let limits = core.parseUsage(result.raw);
+        // A Free plan: claude.ai answers, but reports nothing. Whatever the page reader has
+        // heard from the chat stream is the only usage that exists for this account.
+        const unmetered = limits.length === 0 && core.looksUnmetered(result.raw);
+        const fromStream = unmetered ? await getStreamLimits(orgId) : [];
+        if (fromStream.length) limits = fromStream;
         await setState({
           status: 'ok',
-          limits: core.parseUsage(result.raw),
+          limits,
           fetchedAt: Date.now(),
           message: null,
           org: result.org ? { uuid: result.org.uuid, name: result.org.name } : null,
           orgCount: result.orgs.length,
           orgChoices: [],
           orgs: result.orgs.map((o) => ({ uuid: o.uuid, name: o.name })),
+          unmetered,
+          source: fromStream.length ? 'stream' : 'usage',
         });
       }
     } catch (err) {
@@ -317,6 +397,10 @@ const handlers = {
     const settings = cleanSettings({ ...(await loadSettings()), [key]: value });
     await saveSettings(settings);
     if (key === 'refreshMinutes') await scheduleNext();
+    if (key === 'trackFreeUsage') {
+      await syncReader();
+      await runRefresh(); // pick up or drop the stream readings straight away
+    }
     if (key === 'orgId') {
       orgCache = null;
       await runRefresh();
@@ -329,6 +413,26 @@ const handlers = {
 
   async chooseOrg({ uuid }) {
     return handlers.setSetting({ key: 'orgId', value: String(uuid) });
+  },
+
+  /* A reply just arrived in a claude.ai tab and carried usage with it. Sent by
+     claude-bridge.js, so the numbers come from a web page: they are parsed and merged here
+     the same way whatever their shape, and reach the popup only as ordinary limits. */
+  async streamUsage({ windows, orgId }) {
+    const settings = await loadSettings();
+    if (!settings.trackFreeUsage) return { ok: false };
+    const limits = core.parseStreamWindows(windows);
+    if (!limits.length) return { ok: false };
+    const state = await loadState();
+    const org = orgId || (state.org && state.org.uuid) || null;
+    const merged = core.mergeStreamLimits(await getStreamLimits(org), limits);
+    await saveStreamLimits(org, merged);
+    // Show it at once, but only for the account the popup is actually showing, and only
+    // where claude.ai itself reports nothing.
+    if (state.unmetered && (!state.org || !org || state.org.uuid === org)) {
+      await setState({ limits: merged, source: 'stream', fetchedAt: Date.now() });
+    }
+    return { ok: true };
   },
 
   async openClaude() {
@@ -362,5 +466,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) runRefresh();
 });
 
-chrome.runtime.onInstalled.addListener(() => runRefresh());
-chrome.runtime.onStartup.addListener(() => runRefresh());
+chrome.runtime.onInstalled.addListener(() => {
+  syncReader();
+  runRefresh();
+});
+chrome.runtime.onStartup.addListener(() => {
+  syncReader();
+  runRefresh();
+});
