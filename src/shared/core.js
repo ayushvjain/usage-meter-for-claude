@@ -187,6 +187,91 @@
     return sortLimits(fromList.length ? fromList : parseLegacyKeys(raw));
   }
 
+  /* ---------- Usage from the chat stream (Free accounts) ---------- */
+
+  /*
+   * Free accounts are entitled to /api/organizations/<id>/usage — it answers 200 — but
+   * claude.ai puts nothing in it: every bucket null and an empty `limits` list. The figures
+   * do exist, in the chat stream: each reply carries a `message_limit` event with a
+   * `windows` map, and claude.ai keeps sending it on Free. Reading it needs a page to watch,
+   * so only the browser extension can; the desktop widget has no claude.ai tab to listen to.
+   *
+   * Two conventions differ from /usage, and both are easy to get wrong:
+   *   utilization is a fraction (0.62), where /usage reports a percent (62).
+   *   resets_at is unix seconds, where /usage reports an ISO string.
+   */
+
+  const STREAM_WINDOWS = Object.freeze({
+    '5h': { key: 'stream:5h', kind: 'session', label: 'Current session' },
+    '7d': { key: 'stream:7d', kind: 'weekly', label: 'Weekly, all models' },
+  });
+
+  /** True when /usage answered, but with nothing in it: an account claude.ai doesn't meter. */
+  function looksUnmetered(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+    // Must be the usage envelope itself, not some other 200.
+    if (!('limits' in raw || 'five_hour' in raw || 'seven_day' in raw)) return false;
+    if (Array.isArray(raw.limits) && raw.limits.length > 0) return false;
+    for (const value of Object.values(raw)) {
+      if (value === null || value === undefined) continue;
+      if (typeof value === 'boolean' || typeof value === 'string') continue;
+      if (Array.isArray(value) && value.length === 0) continue;
+      if (typeof value === 'object' && Object.keys(value).length === 0) continue;
+      return false; // something substantive is there, so the account is metered
+    }
+    return true;
+  }
+
+  /**
+   * Turns a `message_limit` event's `windows` map into the same limits the rest of the app
+   * draws. Windows other than the 5-hour and the weekly one are left out: `7d_oi` belongs to
+   * whichever model served that one request, which the stream never names, and `overage` is
+   * paid extra usage, which a Free account cannot have.
+   */
+  function parseStreamWindows(windows) {
+    if (!windows || typeof windows !== 'object') return [];
+    const limits = [];
+    for (const [name, spec] of Object.entries(STREAM_WINDOWS)) {
+      const win = windows[name];
+      if (!win || typeof win !== 'object') continue;
+      const utilization = Number(win.utilization);
+      if (!Number.isFinite(utilization)) continue;
+      const resetsAt = Number(win.resets_at);
+      // A window that is out of messages still reports a fraction below one, so the status
+      // decides: "98%" beside a composer that refuses to send reads as a broken meter.
+      const exceeded = win.status === 'exceeded_limit';
+      limits.push({
+        key: spec.key,
+        label: spec.label,
+        kind: spec.kind,
+        scoped: false,
+        percent: exceeded ? 100 : clampPercent(Math.round(utilization * 100)),
+        resetsAt: Number.isFinite(resetsAt) && resetsAt > 0 ? new Date(resetsAt * 1000).toISOString() : null,
+      });
+    }
+    return sortLimits(limits);
+  }
+
+  /**
+   * Keeps the higher reading for a window that is still the same one. Usage only climbs
+   * within a window, and both sides round independently, so a dip is noise; a genuine reset
+   * arrives with a new reset time, which is what tells the two apart. Windows whose reset has
+   * passed are dropped rather than shown stale, since nothing can refresh them but a message.
+   */
+  function mergeStreamLimits(previous, incoming, now = Date.now()) {
+    const SAME_WINDOW_MS = 5 * 60 * 1000;
+    const byKey = new Map();
+    for (const limit of previous || []) byKey.set(limit.key, limit);
+    for (const limit of incoming || []) {
+      const old = byKey.get(limit.key);
+      const sameWindow =
+        old && Math.abs(new Date(old.resetsAt || 0).getTime() - new Date(limit.resetsAt || 0).getTime()) < SAME_WINDOW_MS;
+      byKey.set(limit.key, sameWindow && limit.percent < old.percent ? old : limit);
+    }
+    const live = [...byKey.values()].filter((l) => !l.resetsAt || new Date(l.resetsAt).getTime() > now);
+    return sortLimits(live);
+  }
+
   /* ---------- Organizations ---------- */
 
   /**
@@ -462,6 +547,9 @@
     peakSegmentsForLocalDay,
     localDayFraction,
     parseUsage,
+    looksUnmetered,
+    parseStreamWindows,
+    mergeStreamLimits,
     chatOrgs,
     resolveOrg,
     levelFor,

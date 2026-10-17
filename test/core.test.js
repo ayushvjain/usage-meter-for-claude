@@ -502,3 +502,66 @@ test('all JavaScript files are syntactically valid', () => {
     assert.equal(r.status, 0, `${path.relative(root, f)}: ${r.stderr}`);
   }
 });
+
+/* ---------- Usage from the chat stream (Free accounts) ---------- */
+
+test('looksUnmetered recognises the empty usage an unmetered account gets', () => {
+  assert.strictEqual(
+    core.looksUnmetered({ limits: [], five_hour: null, seven_day: null, member_dashboard_available: false }),
+    true,
+  );
+  assert.strictEqual(core.looksUnmetered({ limits: [], five_hour: {} }), true);
+});
+
+test('looksUnmetered leaves metered and unrelated responses alone', () => {
+  assert.strictEqual(core.looksUnmetered({ limits: [{ group: 'session', percent: 3 }] }), false);
+  assert.strictEqual(core.looksUnmetered({ five_hour: { utilization: 0, resets_at: '2026-01-01T00:00:00Z' } }), false);
+  assert.strictEqual(core.looksUnmetered({ ok: true }), false, 'not the usage envelope at all');
+  assert.strictEqual(core.looksUnmetered(null), false);
+});
+
+test('parseStreamWindows converts fractions and unix seconds the stream uses', () => {
+  const limits = core.parseStreamWindows({
+    '5h': { utilization: 0.62, resets_at: 1792200000, status: 'within_limit' },
+    '7d': { utilization: 0.41, resets_at: 1792600000, status: 'within_limit' },
+  });
+  assert.deepStrictEqual(limits.map((l) => [l.kind, l.percent]), [['session', 62], ['weekly', 41]]);
+  assert.strictEqual(limits[0].resetsAt, new Date(1792200000 * 1000).toISOString());
+});
+
+test('parseStreamWindows pins an exceeded window to 100%', () => {
+  const [session] = core.parseStreamWindows({ '5h': { utilization: 0.98, resets_at: 1792200000, status: 'exceeded_limit' } });
+  assert.strictEqual(session.percent, 100);
+});
+
+test('parseStreamWindows ignores windows it cannot attribute or a free account cannot have', () => {
+  const limits = core.parseStreamWindows({
+    '5h': { utilization: 0.5, resets_at: 1792200000 },
+    '7d_oi': { utilization: 0.9, resets_at: 1792200000 },
+    overage: { utilization: 0.9, resets_at: 1792200000 },
+  });
+  assert.deepStrictEqual(limits.map((l) => l.key), ['stream:5h']);
+  assert.deepStrictEqual(core.parseStreamWindows(null), []);
+  assert.deepStrictEqual(core.parseStreamWindows({ '5h': { utilization: 'nope' } }), []);
+});
+
+test('mergeStreamLimits keeps the higher reading within one window', () => {
+  const resetsAt = new Date(Date.now() + 3600e3).toISOString();
+  const previous = [{ key: 'stream:5h', label: 'Current session', kind: 'session', percent: 37, resetsAt }];
+  const dip = [{ key: 'stream:5h', label: 'Current session', kind: 'session', percent: 36, resetsAt }];
+  assert.strictEqual(core.mergeStreamLimits(previous, dip)[0].percent, 37);
+
+  const climb = [{ key: 'stream:5h', label: 'Current session', kind: 'session', percent: 44, resetsAt }];
+  assert.strictEqual(core.mergeStreamLimits(previous, climb)[0].percent, 44);
+});
+
+test('mergeStreamLimits takes the lower reading when the window itself reset', () => {
+  const previous = [{ key: 'stream:5h', kind: 'session', percent: 92, resetsAt: new Date(Date.now() + 60e3).toISOString() }];
+  const fresh = [{ key: 'stream:5h', kind: 'session', percent: 4, resetsAt: new Date(Date.now() + 5 * 3600e3).toISOString() }];
+  assert.strictEqual(core.mergeStreamLimits(previous, fresh)[0].percent, 4);
+});
+
+test('mergeStreamLimits drops a window whose reset has passed', () => {
+  const stale = [{ key: 'stream:5h', kind: 'session', percent: 80, resetsAt: new Date(Date.now() - 60e3).toISOString() }];
+  assert.deepStrictEqual(core.mergeStreamLimits(stale, []), []);
+});
