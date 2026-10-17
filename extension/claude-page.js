@@ -1,17 +1,17 @@
 'use strict';
 
 /*
- * Runs inside the claude.ai page itself, in the page's own world, and only when "Read Free
- * plan usage from claude.ai" is turned on in Settings.
+ * Runs inside the claude.ai page itself, in the page's own world, and only while "Read Free
+ * plan usage from claude.ai" is on in Settings.
  *
- * Why it has to be here: claude.ai answers /api/organizations/<id>/usage for a Free account,
- * but with nothing in it. The figures exist only in the chat stream — each reply carries a
+ * Why it has to be here: claude.ai answers /api/organizations/<id>/usage for a Free account
+ * but puts nothing in it. The figures exist only in the chat stream — each reply carries a
  * `message_limit` event with a `windows` map — so the only way to read them is to watch a
- * reply arrive. There is no request the extension can make on its own that produces them.
+ * reply arrive. No request the extension can make on its own produces them.
  *
- * It wraps window.fetch, and reads a *clone* of the response, so the page consumes its own
+ * It wraps window.fetch and reads a *clone* of the response, so the page consumes its own
  * stream exactly as it would have. It never changes a request, a response, or the page, and
- * it posts only usage numbers to the content script beside it.
+ * it posts only usage numbers and a count of the chat requests it saw.
  */
 
 (() => {
@@ -19,9 +19,17 @@
   window.__usageMeterReader = true;
 
   const fetchOriginal = window.fetch.bind(window);
-  const COMPLETION = /\/api\/organizations\/[0-9a-f-]+\/chat_conversations\/[^/]+\/(completion|retry_completion)(\?|$)/i;
 
-  /** The request URL as an absolute string, whatever shape fetch was called with. */
+  // Deliberately loose. The path has changed shape before (and differs between the chat and
+  // other surfaces), and a matcher that is too specific fails silently: no error anywhere,
+  // just a meter that never fills.
+  const COMPLETION = /\/api\/.*\/(completion|retry_completion)(\?|$)/i;
+
+  // claude.ai's newer chat transport: Connect-RPC, binary protobuf, no SSE to read. Accounts
+  // served by it never call /completion at all, so without noticing it here the extension
+  // cannot tell "no reply yet" from "replies this cannot read".
+  const TIMELINE = /\/claudeai-rpc\/[^?#]*ConversationService\/StreamTimeline(?:[?#]|$)/i;
+
   function urlOf(input) {
     try {
       const raw =
@@ -40,6 +48,10 @@
     return match ? match[1] : null;
   }
 
+  function post(payload) {
+    window.postMessage({ source: 'usage-meter-reader', ...payload }, window.location.origin);
+  }
+
   /** The `windows` map, wherever in the event it sits. */
   function findWindows(value, depth = 0) {
     if (!value || typeof value !== 'object' || depth > 6) return null;
@@ -52,15 +64,10 @@
     return null;
   }
 
-  function post(windows, orgId) {
-    window.postMessage({ source: 'usage-meter-reader', windows, orgId }, window.location.origin);
-  }
-
-  /** Reads a copy of the reply stream, line by line, and reports the first usage it carries. */
+  /** Reads a copy of the reply stream, line by line, and reports any usage it carries. */
   async function readStream(response, orgId) {
-    const body = response.body;
-    if (!body) return;
-    const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+    if (!response.body) return;
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = '';
     try {
       for (;;) {
@@ -70,18 +77,18 @@
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
           let event;
           try {
-            event = JSON.parse(line.slice(5).trim());
+            event = JSON.parse(trimmed.slice(5).trim());
           } catch {
             continue;
           }
           const windows = findWindows(event);
-          if (windows) post(windows, orgId);
+          if (windows) post({ windows, orgId });
         }
-        // Keep the tail bounded if a reply ever arrives without newlines.
-        if (buffer.length > 1e6) buffer = buffer.slice(-1e5);
+        if (buffer.length > 1e6) buffer = buffer.slice(-1e5); // keep the tail bounded
       }
     } catch {
       // The page cancelled the reply, or the connection dropped. Nothing to report.
@@ -98,13 +105,18 @@
     const result = fetchOriginal(input, init);
     try {
       const url = urlOf(input);
-      if (COMPLETION.test(url)) {
+      if (TIMELINE.test(url)) {
+        // Seen but unreadable: binary protobuf, which this does not decode. Reported so the
+        // extension can say that plainly instead of waiting for a reply that never parses.
+        post({ sawChat: 'timeline' });
+      } else if (COMPLETION.test(url)) {
+        post({ sawChat: 'completion' });
         const orgId = orgOf(url);
         result.then((response) => {
           try {
             readStream(response.clone(), orgId);
           } catch {
-            /* the body was already consumed or cannot be cloned */
+            /* body already consumed, or not cloneable */
           }
         }, () => {});
       }

@@ -32,6 +32,12 @@
     if (event.source !== window || event.origin !== window.location.origin) return;
     const data = event.data;
     if (!data || data.source !== 'usage-meter-reader') return;
+    // A chat request the reader noticed, with or without usage in it. Counted so Settings
+    // can say whether the reader is seeing anything at all.
+    if (data.sawChat === 'completion' || data.sawChat === 'timeline') {
+      chrome.runtime.sendMessage({ type: 'sawChat', kind: data.sawChat }).catch(() => {});
+      return;
+    }
     const windows = clean(data.windows);
     if (!windows) return;
     const orgId = typeof data.orgId === 'string' && /^[0-9a-f-]{36}$/i.test(data.orgId) ? data.orgId : null;
