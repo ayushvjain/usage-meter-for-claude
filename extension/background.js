@@ -68,7 +68,12 @@ const EMPTY_STATE = Object.freeze({
 /* ---------- Settings ---------- */
 
 function cleanSettings(input) {
-  const s = { ...DEFAULT_SETTINGS, ...(input && typeof input === 'object' ? input : {}) };
+  const stored = input && typeof input === 'object' ? input : {};
+  const s = { ...DEFAULT_SETTINGS, ...stored };
+  // The strip arrived after the Free plan reader. Anyone who had already turned the reader
+  // on wanted their usage where they chat, so they get the strip rather than a switch they
+  // would have to go looking for. Turning it off afterwards sticks, since the key is then set.
+  if (!('showStrip' in stored) && s.trackFreeUsage) s.showStrip = true;
   s.refreshMinutes = core.clampRefreshMinutes(s.refreshMinutes);
   s.showPeakHours = Boolean(s.showPeakHours);
   s.showBadge = Boolean(s.showBadge);
