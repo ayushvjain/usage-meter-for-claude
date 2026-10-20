@@ -31,11 +31,13 @@
     rose: ['#f48fb1', '#c2416f'],
   };
 
+  /* The same two palettes the popup and the widget use: Classic is warm paper, Cozy is
+     the cool indigo panel. */
   const THEMES = {
-    'cozy-dark': { bg: '#292521', border: 'rgba(242,236,227,0.14)', text: '#f2ece3', muted: '#b5aa9b', track: 'rgba(242,236,227,0.12)', warn: '#e0a84e', danger: '#e06a52' },
-    'cozy-light': { bg: '#faf6ef', border: 'rgba(59,50,42,0.16)', text: '#3b322a', muted: '#857565', track: 'rgba(59,50,42,0.11)', warn: '#b8801c', danger: '#b84a33' },
-    'classic-dark': { bg: '#131b29', border: 'rgba(255,255,255,0.1)', text: '#e9eef5', muted: '#8e9bb0', track: 'rgba(255,255,255,0.1)', warn: '#f2b544', danger: '#f07178' },
-    'classic-light': { bg: '#f7f9fc', border: 'rgba(16,28,48,0.12)', text: '#16202e', muted: '#5b6980', track: 'rgba(16,28,48,0.1)', warn: '#c4860a', danger: '#d2414d' },
+    'classic-dark': { bg: '#292521', border: 'rgba(242,236,227,0.14)', text: '#f2ece3', muted: '#b5aa9b', track: 'rgba(242,236,227,0.12)', warn: '#e0a84e', danger: '#e06a52' },
+    'classic-light': { bg: '#faf6ef', border: 'rgba(59,50,42,0.16)', text: '#3b322a', muted: '#857565', track: 'rgba(59,50,42,0.11)', warn: '#b8801c', danger: '#b84a33' },
+    'cozy-dark': { bg: '#1c1f2e', border: 'rgba(196,204,235,0.14)', text: '#e8ebf6', muted: '#959dbb', track: 'rgba(196,204,235,0.13)', warn: '#e8b23c', danger: '#ef6f78' },
+    'cozy-light': { bg: '#f2f4fb', border: 'rgba(38,43,70,0.13)', text: '#222638', muted: '#646a85', track: 'rgba(38,43,70,0.11)', warn: '#b07608', danger: '#cc414b' },
   };
 
   /*
@@ -58,7 +60,7 @@
 
   function palette(settings) {
     const dark = settings.theme === 'dark' || (settings.theme !== 'light' && pageIsDark());
-    const style = settings.style === 'classic' ? 'classic' : 'cozy';
+    const style = settings.style === 'cozy' ? 'cozy' : 'classic';
     const accent = ACCENTS[settings.accent] || ACCENTS.clay;
     return {
       ...THEMES[`${style}-${dark ? 'dark' : 'light'}`],
@@ -116,6 +118,8 @@
        over the divider beside it instead of the row growing or wrapping. */
     .meter { display: flex; align-items: center; gap: 7px; flex: none; }
     .name { color: var(--muted); white-space: nowrap; }
+    /* Cozy's small capitals, so the strip matches the panel it belongs to. */
+    .name--caps { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
     .track { width: 54px; height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; flex: none; }
     /* A span is inline, and width and height do nothing to an inline box: without this the
@@ -510,6 +514,7 @@
     const name = document.createElement('span');
     name.className = 'name';
     name.textContent = limit.kind === 'session' ? 'Session' : limit.scoped ? limit.label.replace(/^Weekly, /, '') : 'Weekly';
+    if (settings.style === 'cozy') name.classList.add('name--caps');
     wrap.append(name);
 
     if (settings.stripBars) {
@@ -567,7 +572,7 @@
     strip.className = 'strip';
     Object.entries({ bg: colours.bg, border: colours.border, text: colours.text, muted: colours.muted, track: colours.track })
       .forEach(([name, value]) => strip.style.setProperty(`--${name}`, value));
-    strip.style.setProperty('--radius', colours.style === 'cozy' ? '14px' : '10px');
+    strip.style.setProperty('--radius', colours.style === 'cozy' ? '20px' : '14px');
 
     const limits = visibleLimits(state, settings);
     if (limits.length) {

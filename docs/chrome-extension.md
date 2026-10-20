@@ -80,7 +80,7 @@ right-click the toolbar icon → **Options** and the popup's `⋯` menu go.
 
 - **General:** refresh interval (1 to 30 minutes), peak hours, the toolbar badge, and
   reading Free plan usage from claude.ai (see above).
-- **Appearance:** style (Cozy or Classic), theme (System, Dark or Light), accent colour, size,
+- **Appearance:** style (Classic or Cozy), theme (System, Dark or Light), accent colour, size,
   and custom CSS. The strip follows all of it, except that on System it takes claude.ai's own
   theme rather than the computer's, so it can't end up light on a dark page.
 - **Account:** which organization to show, if your account has more than one.

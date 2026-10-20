@@ -33,7 +33,8 @@ const READER_STATS_KEY = 'readerStats';
 const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: core.DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
-  style: 'cozy',
+  style: 'classic',
+  styleNames: 2, // bumped when the styles were renamed; see cleanSettings
   theme: 'system',
   accent: 'clay',
   scale: 1,
@@ -77,6 +78,14 @@ const EMPTY_STATE = Object.freeze({
 function cleanSettings(input) {
   const stored = input && typeof input === 'object' ? input : {};
   const s = { ...DEFAULT_SETTINGS, ...stored };
+  /* The two styles swapped names in 0.3.0: the warm, serif look that used to be Cozy is now
+     Classic, and Cozy is a new cool one. Anything saved before that is moved across, so the
+     popup and the strip go on looking exactly as they did. */
+  if (stored.styleNames !== 2) {
+    s.style = 'classic';
+    s.styleNames = 2;
+  }
+
   // The strip arrived after the Free plan reader. Anyone who had already turned the reader
   // on wanted their usage where they chat, so they get the strip rather than a switch they
   // would have to go looking for. Turning it off afterwards sticks, since the key is then set.

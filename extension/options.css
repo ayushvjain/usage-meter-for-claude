@@ -457,9 +457,9 @@ a.btn {
   }
 }
 
-/* ---------- Cozy style: same warm palette and serif headings as the widget ---------- */
+/* ---------- Classic style: same warm palette and serif headings as the widget ---------- */
 
-:root[data-style="cozy"] {
+:root[data-style="classic"] {
   --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --page: #292521;
   --surface: #332e29;
@@ -473,7 +473,7 @@ a.btn {
 }
 
 @media (prefers-color-scheme: light) {
-  :root[data-style="cozy"]:not([data-theme="dark"]) {
+  :root[data-style="classic"]:not([data-theme="dark"]) {
     --page: #faf6ef;
     --surface: #fffdf9;
     --nav: #f2ebe0;
@@ -486,7 +486,7 @@ a.btn {
   }
 }
 
-:root[data-style="cozy"][data-theme="light"] {
+:root[data-style="classic"][data-theme="light"] {
   --page: #faf6ef;
   --surface: #fffdf9;
   --nav: #f2ebe0;
@@ -498,12 +498,63 @@ a.btn {
   --danger: #b84a33;
 }
 
-[data-style="cozy"] .panel h1,
-[data-style="cozy"] .about-name {
+[data-style="classic"] .panel h1,
+[data-style="classic"] .about-name {
   font-family: var(--font-serif);
+}
+
+[data-style="classic"] .segmented button,
+[data-style="classic"] .btn {
+  border-radius: 999px;
+}
+
+/* ---------- Cozy style: the cool indigo panel, matching the widget ---------- */
+
+:root[data-style="cozy"] {
+  --page: #1c1f2e;
+  --surface: #252939;
+  --nav: #171a27;
+  --border: rgba(196, 204, 235, 0.14);
+  --text: #e8ebf6;
+  --muted: #959dbb;
+  --hover: rgba(196, 204, 235, 0.08);
+  --on-accent: #14172a;
+  --danger: #ef6f78;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-style="cozy"]:not([data-theme="dark"]) {
+    --page: #f2f4fb;
+    --surface: #ffffff;
+    --nav: #e8ebf6;
+    --border: rgba(38, 43, 70, 0.13);
+    --text: #222638;
+    --muted: #646a85;
+    --hover: rgba(38, 43, 70, 0.05);
+    --on-accent: #ffffff;
+    --danger: #cc414b;
+  }
+}
+
+:root[data-style="cozy"][data-theme="light"] {
+  --page: #f2f4fb;
+  --surface: #ffffff;
+  --nav: #e8ebf6;
+  --border: rgba(38, 43, 70, 0.13);
+  --text: #222638;
+  --muted: #646a85;
+  --hover: rgba(38, 43, 70, 0.05);
+  --on-accent: #ffffff;
+  --danger: #cc414b;
+}
+
+/* No serif headings here, and squarer controls than Classic's pills. */
+[data-style="cozy"] .panel h1 {
+  font-family: var(--font);
+  letter-spacing: -0.01em;
 }
 
 [data-style="cozy"] .segmented button,
 [data-style="cozy"] .btn {
-  border-radius: 999px;
+  border-radius: 9px;
 }

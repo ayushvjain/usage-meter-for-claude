@@ -9,7 +9,7 @@ const DEFAULTS = Object.freeze({
   refreshMinutes: DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
   startWithWindows: false,
-  style: 'cozy', // cozy (warm colours, serif numbers) or classic
+  style: 'classic', // classic (warm paper, serif numbers) or cozy (cool indigo panel)
   theme: 'system', // system, dark or light
   accent: 'clay', // bar and button colour
   opacity: 90, // panel background opacity in percent
@@ -18,6 +18,7 @@ const DEFAULTS = Object.freeze({
   dangerAt: 85,
   position: null, // { x, y } of the widget's top-left tile once placed
   orgId: null, // organization the user picked when the account has several
+  styleNames: 2, // bumped when the styles were renamed; see migrateStyle
 });
 
 // Settings from older versions that no longer exist. The widget now sizes itself.
@@ -42,8 +43,21 @@ function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
 }
 
+/*
+ * The two styles swapped names in 0.3.0: the warm, serif look that used to be Cozy is now
+ * Classic, and Cozy is a new cool one. Settings written before that are moved across, so
+ * the widget goes on looking exactly as it did; the old cool Classic no longer exists, and
+ * its few users land on the warm one too.
+ */
+function migrateStyle(settings, stored) {
+  // Read the mark from what was on disk, not from the defaults merged over it.
+  if (stored.styleNames === 2) return settings;
+  return { ...settings, style: 'classic', styleNames: 2 };
+}
+
 function sanitize(input) {
-  const s = { ...DEFAULTS, ...(input && typeof input === 'object' ? input : {}) };
+  const stored = input && typeof input === 'object' ? input : {};
+  const s = migrateStyle({ ...DEFAULTS, ...stored }, stored);
   RETIRED.forEach((key) => delete s[key]);
   for (const [key, clean] of Object.entries(EDITABLE)) s[key] = clean(s[key]);
   s.warnAt = Number.isFinite(Number(s.warnAt)) ? Number(s.warnAt) : DEFAULTS.warnAt;
