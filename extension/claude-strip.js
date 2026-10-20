@@ -667,26 +667,42 @@
     }).slice(0, 3);
   }
 
-  /** "12% an hour", or an honest word when there is not enough history to say. */
+  const rounded = (rate) => (rate >= 10 ? Math.round(rate) : Math.round(rate * 10) / 10);
+
+  /*
+   * What the hover says about a limit. The headline is the average over the window so far —
+   * used, divided by how long the window has been running — because it is there from the
+   * first reading and it falls while you wait, which is the number someone deciding whether
+   * to keep going actually wants. The last hour is added underneath once there are enough
+   * readings to mean something, and only when it differs from the average.
+   */
   function paceLines(limit, trend) {
     const core = window.UsageCore;
-    const entry = (trend || {})[limit.key];
+    const entry = (trend || {})[limit.key] || {};
     const label = limit.kind === 'session' ? 'This session' : 'This week';
+    const head = limit.percent >= 100 ? `${label}: at the limit` : `${label}: ${Math.round(limit.percent)}% used`;
+    const avg = entry.avgPerHour;
 
-    if (!entry || entry.perHour === null || entry.perHour === undefined) {
-      return [`${label}: ${Math.round(limit.percent)}% used`, 'Checking the pace — this needs a few minutes of readings.'];
-    }
-    if (entry.perHour === 0) {
-      return [`${label}: ${Math.round(limit.percent)}% used`, 'Not moving over the last hour.'];
+    if (avg === null || avg === undefined) {
+      if (entry.perHour) return [head, `Using about ${rounded(entry.perHour)}% an hour over the last hour.`];
+      // Either the window has only just opened, so dividing by it is noise, or claude.ai
+      // gave no reset time to measure against. Say which rather than showing a bare number.
+      return [head, limit.resetsAt ? 'This window just started — the pace needs a minute or two.' : 'No reset time reported, so there is no window to measure the pace against.'];
     }
 
-    const rate = entry.perHour >= 10 ? Math.round(entry.perHour) : Math.round(entry.perHour * 10) / 10;
-    const pace = `Using about ${rate}% an hour`;
-    if (entry.etaMs) {
-      return [`${label}: ${Math.round(limit.percent)}% used`, `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at this pace.`];
-    }
-    if (limit.percent >= 100) return [`${label}: at the limit`, `${pace} before it filled.`];
-    return [`${label}: ${Math.round(limit.percent)}% used`, `${pace}. It resets before running out at this pace.`];
+    const pace = avg > 0 ? `Averaging ${rounded(avg)}% an hour this ${limit.kind === 'session' ? 'session' : 'week'}` : 'Nothing used yet';
+    const projection = entry.etaMs
+      ? `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at that pace.`
+      : avg > 0
+        ? `${pace}. It resets before running out at that pace.`
+        : `${pace}.`;
+
+    const recent =
+      entry.perHour !== null && entry.perHour !== undefined && Math.abs(entry.perHour - avg) >= 1
+        ? `Last hour: ${rounded(entry.perHour)}% an hour.`
+        : null;
+
+    return [head, projection, recent];
   }
 
   /** Peak hours, the same schedule the widget and the popup use. */

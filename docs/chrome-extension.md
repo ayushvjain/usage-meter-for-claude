@@ -71,11 +71,21 @@ has and the widget does not.
 
 ## Pace, and the size of a chat
 
-Hovering a reading on the strip says how fast it is going: *"Using about 12% an hour — about
-2h to 100% at this pace."* The pace comes from readings kept over the last few hours, per
-limit and per window, so a reset starts the measurement again rather than averaging across
-it. Until there are a few minutes of readings it says so instead of guessing, and a limit
-that has not moved says that too. The same line is the popup's tooltip on each bar.
+Hovering a reading on the strip says how fast it is going: *"Averaging 10% an hour this
+session — about 2h to 100% at that pace."*
+
+The headline figure is the average over the window so far — what has been used, divided by
+how long the window has been running. claude.ai reports when a window resets but not how
+long it is; the lengths are fixed (five hours for the session, seven days for the weekly
+limits), so the elapsed time is known and the average is there from the very first reading.
+It also falls on its own while you are idle, which is the point: wait a few minutes and
+watch the pace drop and the projection stretch.
+
+Underneath, when there are enough readings to mean something and it differs from the
+average, comes *"Last hour: 22% an hour"* — what is happening right now, as opposed to over
+the whole window. Those readings are kept per limit and per window, so a reset starts the
+measurement again rather than averaging across it. The same headline is the popup's tooltip
+on each bar.
 
 The strip can also show the size of the conversation you have open — `Chat ~12k tokens`,
 with the split between what you sent and what came back on hover. claude.ai publishes no

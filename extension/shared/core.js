@@ -285,6 +285,15 @@
    * nothing but storage.
    */
 
+  /*
+   * How long each kind of window runs. claude.ai reports when a window resets but never how
+   * long it is, and the lengths are fixed: the session is five hours, the weekly limits are
+   * seven days. Knowing both gives the elapsed time, and with it an average pace that is
+   * available from the first reading instead of after several.
+   */
+  const WINDOW_MS = Object.freeze({ session: 5 * HOUR, weekly: 7 * DAY });
+  const MIN_ELAPSED_MS = 3 * MINUTE; // dividing by the first seconds of a window is nonsense
+
   const TREND_MAX_AGE_MS = 8 * HOUR;
   const TREND_MIN_SPAN_MS = 4 * MINUTE; // below this the arithmetic is mostly rounding noise
 
@@ -335,6 +344,24 @@
     const latest = all[all.length - 1];
     if (latest && endOf(latest) - latest.at >= TREND_MIN_SPAN_MS) return 0;
     return null;
+  }
+
+  /**
+   * The average pace since this window began: what has been used, over how long it has been
+   * running. Unlike usageRate it needs no history at all, so it can answer immediately, and
+   * it falls on its own while nothing is being used — which is the honest picture of an
+   * average. null when the window length or its reset is unknown, or it has only just begun.
+   */
+  function averageRate({ percent, resetsAt, kind, windowMs = null, now = Date.now() }) {
+    const length = windowMs || WINDOW_MS[kind];
+    if (!length || !resetsAt) return null;
+    const reset = new Date(resetsAt).getTime();
+    if (!Number.isFinite(reset)) return null;
+    const elapsed = length - (reset - now);
+    if (!(elapsed >= MIN_ELAPSED_MS) || elapsed > length) return null;
+    const used = Number(percent);
+    if (!Number.isFinite(used) || used < 0) return null;
+    return (used / elapsed) * HOUR;
   }
 
   /**
@@ -628,8 +655,10 @@
     peakSegmentsForLocalDay,
     localDayFraction,
     parseUsage,
+    WINDOW_MS,
     recordSample,
     usageRate,
+    averageRate,
     timeToLimit,
     looksUnmetered,
     parseStreamWindows,

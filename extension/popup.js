@@ -123,10 +123,11 @@
   /** "Using about 12% an hour — about 2h to 100% at this pace", when there is enough to say. */
   function paceFor(limit) {
     const entry = (state.trend || {})[limit.key];
-    if (!entry || !entry.perHour) return '';
-    const rate = entry.perHour >= 10 ? Math.round(entry.perHour) : Math.round(entry.perHour * 10) / 10;
-    const pace = `Using about ${rate}% an hour`;
-    return entry.etaMs ? `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at this pace.` : `${pace}.`;
+    const avg = entry && (entry.avgPerHour ?? entry.perHour);
+    if (!avg) return '';
+    const rate = avg >= 10 ? Math.round(avg) : Math.round(avg * 10) / 10;
+    const pace = `Averaging ${rate}% an hour this ${limit.kind === 'session' ? 'session' : 'week'}`;
+    return entry.etaMs ? `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at that pace.` : `${pace}.`;
   }
 
   /** One column of limits: the session first, then each weekly limit. */

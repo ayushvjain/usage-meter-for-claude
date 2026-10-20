@@ -632,3 +632,44 @@ test('timeToLimit stays quiet when the window resets first', () => {
   const later = new Date(now + 5 * HOUR_MS).toISOString();
   assert.strictEqual(core.timeToLimit({ percent: 50, ratePerHour: 25, resetsAt: later, now }), 2 * HOUR_MS);
 });
+
+test('averageRate answers from the first reading, with no history', () => {
+  const now = Date.now();
+  // Two hours into a five-hour session, 30% used: 15% an hour.
+  const resetsAt = new Date(now + 3 * HOUR_MS).toISOString();
+  assert.strictEqual(core.averageRate({ percent: 30, resetsAt, kind: 'session', now }), 15);
+});
+
+test('averageRate falls while nothing is being used', () => {
+  const now = Date.now();
+  const busy = core.averageRate({ percent: 30, resetsAt: new Date(now + 3 * HOUR_MS).toISOString(), kind: 'session', now });
+  const idle = core.averageRate({ percent: 30, resetsAt: new Date(now + 2 * HOUR_MS).toISOString(), kind: 'session', now });
+  assert.ok(idle < busy, 'an hour later with no more usage, the average must be lower');
+  assert.strictEqual(Math.round(idle), 10);
+});
+
+test('averageRate measures the weekly window over seven days', () => {
+  const now = Date.now();
+  const resetsAt = new Date(now + 5 * 24 * HOUR_MS).toISOString(); // two days in
+  // 48 points over 48 hours; compared with a tolerance, since the division rarely lands exactly.
+  assert.ok(Math.abs(core.averageRate({ percent: 48, resetsAt, kind: 'weekly', now }) - 1) < 1e-9);
+});
+
+test('averageRate stays quiet when it cannot know', () => {
+  const now = Date.now();
+  assert.strictEqual(core.averageRate({ percent: 10, resetsAt: null, kind: 'session', now }), null);
+  assert.strictEqual(core.averageRate({ percent: 10, resetsAt: new Date(now + HOUR_MS).toISOString(), kind: 'other', now }), null);
+  const justStarted = new Date(now + 5 * HOUR_MS - 30 * 1000).toISOString();
+  assert.strictEqual(core.averageRate({ percent: 2, resetsAt: justStarted, kind: 'session', now }), null, 'half a minute in, the maths is noise');
+});
+
+test('averageRate and timeToLimit together give the projection', () => {
+  const now = Date.now();
+  const resetsAt = new Date(now + 3 * HOUR_MS).toISOString();
+  const rate = core.averageRate({ percent: 30, resetsAt, kind: 'session', now });
+  // 70 points left at 15 an hour is 4h40m, which is past the reset, so there is no warning.
+  assert.strictEqual(core.timeToLimit({ percent: 30, ratePerHour: rate, resetsAt, now }), null);
+  // Same pace, but 80% used: 1h20m left, well inside the window.
+  const soon = core.timeToLimit({ percent: 80, ratePerHour: rate, resetsAt, now });
+  assert.strictEqual(Math.round(soon / 60000), 80);
+});

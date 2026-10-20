@@ -164,10 +164,18 @@ async function updateTrend(limits) {
   for (const limit of limits) {
     const samples = core.recordSample(history[limit.key], { percent: limit.percent, resetsAt: limit.resetsAt, at: now });
     next[limit.key] = samples;
+    /* Two paces, and they answer different questions. The average over the whole window is
+       available at once and drifts down while nothing is used, which is what someone waiting
+       for a reset wants to watch. The last hour says what is happening right now, but needs
+       a few readings before it means anything. The projection follows the average, so it
+       exists from the first reading too. */
+    const avgPerHour = core.averageRate({ percent: limit.percent, resetsAt: limit.resetsAt, kind: limit.kind, now });
     const perHour = core.usageRate(samples, { now });
+    const basis = avgPerHour === null ? perHour : avgPerHour;
     trend[limit.key] = {
+      avgPerHour,
       perHour,
-      etaMs: perHour === null ? null : core.timeToLimit({ percent: limit.percent, ratePerHour: perHour, resetsAt: limit.resetsAt, now }),
+      etaMs: basis === null ? null : core.timeToLimit({ percent: limit.percent, ratePerHour: basis, resetsAt: limit.resetsAt, now }),
       since: samples.length ? samples[0].at : null,
     };
   }
