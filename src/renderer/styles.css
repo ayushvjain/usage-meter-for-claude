@@ -741,6 +741,8 @@ body {
   height: var(--ring);
   border-radius: 50%;
   background: conic-gradient(var(--level) 0 var(--p, 0%), var(--track) var(--p, 0%) 100%);
+  /* The shorthand resets the segment mask the weekly gauges set, which is what is wanted:
+     the ring is one continuous sweep with a hole in it. */
   -webkit-mask: radial-gradient(farthest-side, transparent 0 66%, #000 67%);
   mask: radial-gradient(farthest-side, transparent 0 66%, #000 67%);
 }
@@ -767,16 +769,43 @@ body {
 
 /* ---------- Weekly limits as segmented gauges ---------- */
 
+/* Segments are cut by a mask, not painted by a repeating gradient. A gradient repeats on a
+   fixed period, which almost never divides the track's width, so the last cell is clipped
+   and leaves a stub at the end. A mask sized at 100%/count always divides exactly, however
+   wide the track is, and the colour underneath is one clean sweep to the percentage. */
 [data-style="cozy"] .track {
-  border-radius: 2px;
-  background:
-    repeating-linear-gradient(90deg, var(--track) 0 7px, transparent 7px 10px);
+  --segments: 18;
+  --segment-gap: 3px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--level) 0 var(--p, 0%), var(--track) var(--p, 0%) 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+  mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+  -webkit-mask-size: calc(100% / var(--segments)) 100%;
+  mask-size: calc(100% / var(--segments)) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
 }
 
 [data-style="cozy"] .fill {
-  border-radius: 0;
-  background:
-    repeating-linear-gradient(90deg, var(--level) 0 7px, transparent 7px 10px);
+  display: none; /* the track draws the whole gauge, lit and unlit together */
+}
+
+[data-style="cozy"] .limit--hero .track {
+  --segments: 1; /* the session is the ring, which must not be chopped up */
+}
+
+[data-style="cozy"] .day-strip {
+  --segments: 24; /* one cell an hour, which is what the strip is counting */
+  --segment-gap: 3px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--track);
+  -webkit-mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+  mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+  -webkit-mask-size: calc(100% / var(--segments)) 100%;
+  mask-size: calc(100% / var(--segments)) 100%;
+  -webkit-mask-repeat: repeat-x;
+  mask-repeat: repeat-x;
 }
 
 [data-style="cozy"] .limit {
@@ -808,12 +837,6 @@ body {
   display: flex;
   font-size: 9px;
   letter-spacing: 0.08em;
-}
-
-[data-style="cozy"] .day-strip {
-  height: 8px;
-  border-radius: 2px;
-  background: repeating-linear-gradient(90deg, var(--track) 0 7px, transparent 7px 10px);
 }
 
 [data-style="cozy"] .day-strip .segment {

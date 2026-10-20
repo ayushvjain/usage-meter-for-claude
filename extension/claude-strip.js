@@ -126,15 +126,23 @@
       font-size: 11px;
       letter-spacing: 0.02em;
     }
+    /* Cells are cut by a mask rather than painted by a repeating gradient: a gradient
+       repeats on a fixed period, which does not divide 54px evenly, so the last cell came
+       out as a stub. A mask sized at 100%/count always divides exactly. */
     .strip--cozy .track {
+      --segments: 7;
+      --segment-gap: 2px;
       height: 9px;
       border-radius: 1px;
-      background: repeating-linear-gradient(90deg, var(--track) 0 6px, transparent 6px 8.5px);
+      background: linear-gradient(90deg, var(--level) 0 var(--p, 0%), var(--track) var(--p, 0%) 100%);
+      -webkit-mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+      mask-image: linear-gradient(90deg, #000 0 calc(100% - var(--segment-gap)), transparent calc(100% - var(--segment-gap)) 100%);
+      -webkit-mask-size: calc(100% / var(--segments)) 100%;
+      mask-size: calc(100% / var(--segments)) 100%;
+      -webkit-mask-repeat: repeat-x;
+      mask-repeat: repeat-x;
     }
-    .strip--cozy .fill {
-      border-radius: 0;
-      background: repeating-linear-gradient(90deg, var(--level) 0 6px, transparent 6px 8.5px);
-    }
+    .strip--cozy .fill { display: none; }
     .strip--cozy .close { border-radius: 2px; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
     .track { width: 54px; height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; flex: none; }
@@ -637,9 +645,12 @@
     if (settings.stripBars) {
       const track = document.createElement('span');
       track.className = 'track';
+      const pct = Math.max(0, Math.min(100, limit.percent));
+      // On the track as well as the fill, so Cozy can draw lit and unlit as one gauge.
+      track.style.setProperty('--p', `${pct}%`);
       const fill = document.createElement('span');
       fill.className = 'fill';
-      fill.style.width = `${Math.max(0, Math.min(100, limit.percent))}%`;
+      fill.style.width = `${pct}%`;
       track.append(fill);
       wrap.append(track);
     }
