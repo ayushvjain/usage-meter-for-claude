@@ -499,12 +499,27 @@ async function scheduleNext() {
   await setState({ nextRefreshAt: alarm ? alarm.scheduledTime : null });
 }
 
-/** Refreshes only if the cached usage is older than one interval. Used when the popup opens. */
+/*
+ * Makes sure a countdown exists, without restarting one that is already running.
+ *
+ * This matters more than it looks. chrome.alarms.create replaces an alarm of the same name
+ * and starts its period again, so calling scheduleNext() on a timer — which the strip now
+ * does, every twenty seconds — would push the next automatic refresh five minutes into the
+ * future every twenty seconds, and it would never arrive.
+ */
+async function ensureAlarm() {
+  const alarm = await chrome.alarms.get(ALARM);
+  if (!alarm) return scheduleNext();
+  await setState({ nextRefreshAt: alarm.scheduledTime });
+  return alarm;
+}
+
+/** Refreshes only if what we hold is older than one interval. Safe to call often. */
 async function refreshIfStale() {
   const [state, settings] = await Promise.all([loadState(), loadSettings()]);
   const age = state.fetchedAt ? Date.now() - state.fetchedAt : Infinity;
   if (age > settings.refreshMinutes * 60 * 1000) await runRefresh();
-  else await scheduleNext();
+  else await ensureAlarm();
 }
 
 /* ---------- Messages from the popup and the options page ---------- */
@@ -583,6 +598,14 @@ const handlers = {
   async openOptions() {
     await chrome.runtime.openOptionsPage();
     return { ok: true };
+  },
+
+  /* The strip asks on its own schedule. Without this it only ever showed whatever the last
+     alarm left behind, so a missed or failed refresh went unnoticed for as long as the tab
+     stayed open — the numbers simply stopped moving. */
+  async refreshStale() {
+    refreshIfStale();
+    return handlers.get();
   },
 
   async popupOpened() {

@@ -143,6 +143,8 @@
     .fill { display: block; height: 100%; border-radius: inherit; background: var(--level); }
     .reset { color: var(--muted); white-space: nowrap; }
     .tokens { color: var(--muted); white-space: nowrap; cursor: default; }
+    /* Only shown when the readings have stopped being refreshed. */
+    .stale { color: var(--warn-text, var(--muted)); white-space: nowrap; cursor: default; opacity: 0.85; }
     .meter { cursor: default; }
     .note { color: var(--muted); }
     /* The gear and the close button travel as one: a row that wraps must not leave a lone
@@ -740,6 +742,24 @@
         }
         strip.append(meter(limit, colours, settings, state.trend));
       });
+      const age = state.fetchedAt ? Date.now() - state.fetchedAt : null;
+      const interval = Math.max(1, Number(settings.refreshMinutes) || 5) * 60000;
+      // Two missed refreshes: say so rather than present old numbers as current.
+      if (age !== null && age > 2 * interval) {
+        const divider = document.createElement('span');
+        divider.className = 'divider';
+        const stale = document.createElement('span');
+        stale.className = 'stale';
+        stale.textContent = `⚠ ${countdown(new Date(Date.now() + age).toISOString())} old`;
+        explains(stale, colours, () => [
+          `These readings are ${countdown(new Date(Date.now() + age).toISOString())} old.`,
+          state.status === 'error' && state.message
+            ? `The last refresh failed: ${state.message}`
+            : 'Trying again now. If this sticks, open claude.ai in a tab and check you are still signed in.',
+        ]);
+        strip.append(divider, stale);
+      }
+
       if (settings.stripTokens && tokenEstimate && tokenEstimate.conversation) {
         const total = tokenEstimate.input + tokenEstimate.output;
         const divider = document.createElement('span');
@@ -850,9 +870,9 @@
 
   let lastConversation = null;
 
-  async function update() {
+  async function update({ ask = false } = {}) {
     try {
-      const payload = await chrome.runtime.sendMessage({ type: 'get' });
+      const payload = await chrome.runtime.sendMessage({ type: ask ? 'refreshStale' : 'get' });
       if (payload && payload.state && payload.settings) {
         render(payload.state, payload.settings);
         if (payload.settings.stripTokens) {
@@ -897,8 +917,15 @@
   // A backstop for a rebuild that somehow stirs no mutations this observer sees.
   const anchorTimer = setInterval(place, 1500);
 
-  update();
-  timer = setInterval(update, POLL_MS);
+  /* Every poll asks the worker to refresh if its numbers are past their interval; the worker
+     does nothing when they are fresh, so this is cheap. Coming back to the tab asks at once,
+     since a background tab's timers are throttled and may have barely run. */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') update({ ask: true });
+  });
+
+  update({ ask: true });
+  timer = setInterval(() => update({ ask: true }), POLL_MS);
   window.addEventListener('pagehide', () => {
     clearInterval(timer);
     clearInterval(anchorTimer);
