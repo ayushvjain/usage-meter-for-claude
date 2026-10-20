@@ -9,7 +9,7 @@ const DEFAULTS = Object.freeze({
   refreshMinutes: DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
   startWithWindows: false,
-  style: 'classic', // classic (warm paper, serif numbers) or cozy (cool indigo panel)
+  style: 'cozy', // cozy (graphite dashboard, ring gauge) or classic (warm paper, serif numbers)
   theme: 'system', // system, dark or light
   accent: 'clay', // bar and button colour
   opacity: 90, // panel background opacity in percent
@@ -50,8 +50,10 @@ function configPath() {
  * its few users land on the warm one too.
  */
 function migrateStyle(settings, stored) {
-  // Read the mark from what was on disk, not from the defaults merged over it.
-  if (stored.styleNames === 2) return settings;
+  // Read the mark from what was on disk, not from the defaults merged over it. An empty file
+  // is a fresh install, which should get today's default rather than the old look.
+  const existing = Object.keys(stored).length > 0;
+  if (!existing || stored.styleNames === 2) return { ...settings, styleNames: 2 };
   return { ...settings, style: 'classic', styleNames: 2 };
 }
 

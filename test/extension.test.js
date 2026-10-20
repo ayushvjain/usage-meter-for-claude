@@ -31,6 +31,15 @@ test('the manifest only asks for the permissions it uses', () => {
   assert.deepStrictEqual(manifest.host_permissions, ['https://claude.ai/*']);
 });
 
+test('both toolbar icon sets are complete', () => {
+  // The manifest's set is the one the stores show; the Classic set is swapped in at runtime
+  // when someone picks that style, so a missing size would leave a blank toolbar button.
+  for (const size of [16, 32, 48, 128]) {
+    assert.ok(fs.existsSync(path.join(extension, 'icons', `icon-${size}.png`)), `missing icon-${size}.png`);
+    assert.ok(fs.existsSync(path.join(extension, 'icons', `icon-classic-${size}.png`)), `missing icon-classic-${size}.png`);
+  }
+});
+
 test('the page reader ships with the extension', () => {
   for (const file of ['claude-page.js', 'claude-bridge.js']) {
     assert.ok(fs.existsSync(path.join(extension, file)), `missing ${file}`);

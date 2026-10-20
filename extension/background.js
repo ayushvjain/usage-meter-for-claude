@@ -34,7 +34,7 @@ const TREND_KEY = 'trend';
 const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: core.DEFAULT_REFRESH_MINUTES,
   showPeakHours: true,
-  style: 'classic',
+  style: 'cozy',
   styleNames: 2, // bumped when the styles were renamed; see cleanSettings
   theme: 'system',
   accent: 'clay',
@@ -85,10 +85,12 @@ function cleanSettings(input) {
   /* The two styles swapped names in 0.3.0: the warm, serif look that used to be Cozy is now
      Classic, and Cozy is a new cool one. Anything saved before that is moved across, so the
      popup and the strip go on looking exactly as they did. */
-  if (stored.styleNames !== 2) {
+  // Only for settings that already existed: a fresh install should get today's default,
+  // not be "migrated" to the look it never had.
+  if (Object.keys(stored).length > 0 && stored.styleNames !== 2) {
     s.style = 'classic';
-    s.styleNames = 2;
   }
+  s.styleNames = 2;
 
   // The strip arrived after the Free plan reader. Anyone who had already turned the reader
   // on wanted their usage where they chat, so they get the strip rather than a switch they
@@ -177,6 +179,28 @@ async function updateTrend(limits) {
 /* ---------- Toolbar badge ---------- */
 
 const BADGE_COLOURS = { ok: '#3f7f6f', warn: '#b8801c', danger: '#b84a33' };
+
+/*
+ * The toolbar icon follows the chosen style, so the thing in the toolbar matches the panel
+ * that drops out of it: the segmented graphite dial for Cozy, the warm clay arc for Classic.
+ * Only the toolbar changes — the icon in the stores and in the extensions list is the
+ * manifest's, which stays the segmented one.
+ */
+const ICONS = {
+  cozy: { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png', 48: 'icons/icon-48.png', 128: 'icons/icon-128.png' },
+  classic: {
+    16: 'icons/icon-classic-16.png',
+    32: 'icons/icon-classic-32.png',
+    48: 'icons/icon-classic-48.png',
+    128: 'icons/icon-classic-128.png',
+  },
+};
+
+async function paintIcon(settings) {
+  const path = ICONS[settings.style] || ICONS.cozy;
+  // A failure here is cosmetic: the manifest's icon stays, and nothing else should stop.
+  await chrome.action.setIcon({ path }).catch(() => {});
+}
 
 async function paintBadge(state, settings) {
   const session = state.limits.find((l) => l.kind === 'session') || state.limits[0];
@@ -493,6 +517,7 @@ const handlers = {
     const settings = cleanSettings({ ...(await loadSettings()), [key]: value });
     await saveSettings(settings);
     if (key === 'refreshMinutes') await scheduleNext();
+    if (key === 'style') await paintIcon(settings);
     if (key === 'trackFreeUsage' || key === 'showStrip') {
       await syncReader();
       if (key === 'trackFreeUsage') await runRefresh(); // pick up or drop stream readings at once
@@ -573,11 +598,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM) runRefresh();
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-  syncReader();
-  runRefresh();
-});
-chrome.runtime.onStartup.addListener(() => {
-  syncReader();
-  runRefresh();
-});
+async function wake() {
+  const settings = await loadSettings();
+  await paintIcon(settings);
+  await syncReader();
+  await runRefresh();
+}
+
+chrome.runtime.onInstalled.addListener(wake);
+chrome.runtime.onStartup.addListener(wake);
