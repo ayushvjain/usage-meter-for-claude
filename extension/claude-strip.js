@@ -77,7 +77,7 @@
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 14px;
+      gap: 11px;
       row-gap: 7px;
       flex: 0 1 auto;
       max-width: 100%;
@@ -119,9 +119,12 @@
     .fill { display: block; height: 100%; border-radius: inherit; background: var(--level); }
     .reset { color: var(--muted); white-space: nowrap; }
     .note { color: var(--muted); }
+    /* The gear and the close button travel as one: a row that wraps must not leave a lone
+       × stranded on a line of its own. */
+    .tools { display: flex; align-items: center; gap: 1px; flex: none; margin-left: -2px; }
     .close {
       flex: none;
-      width: 22px; height: 22px;
+      width: 20px; height: 20px;
       display: grid; place-items: center;
       margin-left: 2px;
       border: 0; border-radius: 6px;
@@ -508,6 +511,7 @@
       fill.className = 'fill';
       fill.style.width = `${Math.max(0, Math.min(100, limit.percent))}%`;
       track.append(fill);
+      track.dataset.drop = 'bars';
       wrap.append(track);
     }
 
@@ -520,6 +524,7 @@
     if (wantsReset && limit.resetsAt) {
       const reset = document.createElement('span');
       reset.className = 'reset';
+      reset.dataset.drop = limit.kind === 'session' ? 'sessionReset' : 'weeklyReset';
       reset.textContent = `· resets in ${countdown(limit.resetsAt)}`;
       wrap.append(reset);
     }
@@ -573,8 +578,10 @@
         if (peak) {
           const divider = document.createElement('span');
           divider.className = 'divider';
+          divider.dataset.drop = 'peak';
           const note = document.createElement('span');
           note.className = 'reset';
+          note.dataset.drop = 'peak';
           note.textContent = peak;
           strip.append(divider, note);
         }
@@ -601,7 +608,6 @@
       event.stopPropagation();
       toggleMenu(settings);
     });
-    strip.append(gear);
 
     const close = document.createElement('button');
     close.className = 'close';
@@ -614,27 +620,50 @@
       closeMenu();
       shadow.querySelectorAll('.row').forEach((el) => el.remove());
     });
-    strip.append(close);
+    const tools = document.createElement('span');
+    tools.className = 'tools';
+    tools.append(gear, close);
+    strip.append(tools);
     row.append(strip);
     shadow.append(row);
     place();
     repositionMenu();
 
-    /* Dividers only make sense between items sharing a line, and whether the row wrapped is
-       something only the laid-out page knows. The dividers themselves are excluded from the
-       measurement: they stretch to the full height of the row, so their top never matches a
-       vertically centred item's and every row would otherwise look wrapped. */
-    requestAnimationFrame(() => {
-      const items = [...strip.children].filter((item) => !item.classList.contains('divider'));
-      if (items.length < 2) return;
-      /* Comparing the row's own height against its tallest item, rather than comparing the
-         items' tops to each other: items of different heights on one line (a button beside
-         a line of text) sit at different tops while sharing it. */
-      const style = getComputedStyle(strip);
-      const content = strip.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
-      const tallest = Math.max(...items.map((item) => item.getBoundingClientRect().height));
-      strip.classList.toggle('strip--wrapped', content > tallest + 2);
-    });
+    requestAnimationFrame(() => fit(strip));
+  }
+
+  /*
+   * Fitting the strip to the composer.
+   *
+   * A narrow composer, a wide system font or an extra limit can all push the row past the
+   * width it has. Wrapping it is worse than it sounds: the line below holds whatever fell
+   * off the end, which is usually nothing but the two buttons. So detail is dropped instead,
+   * least useful first, until the row fits on one line — the percentages, which are the
+   * point of the strip, are the last thing to go and never do.
+   */
+  const SHEDDING_ORDER = ['peak', 'weeklyReset', 'sessionReset', 'bars'];
+
+  /** True while the row needs more than one line. Measured by height: items of different
+      heights on one line sit at different tops, so tops cannot answer this. */
+  function wraps(strip) {
+    const items = [...strip.children].filter((item) => !item.classList.contains('divider'));
+    if (items.length < 2) return false;
+    const style = getComputedStyle(strip);
+    const content = strip.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const tallest = Math.max(...items.map((item) => item.getBoundingClientRect().height));
+    return content > tallest + 2;
+  }
+
+  function fit(strip) {
+    if (!strip.isConnected) return;
+    for (const part of SHEDDING_ORDER) {
+      if (!wraps(strip)) break;
+      const droppable = strip.querySelectorAll(`[data-drop="${part}"]`);
+      if (!droppable.length) continue;
+      droppable.forEach((el) => el.remove());
+    }
+    // Still too long — two limits with long names, say — so let it wrap after all.
+    strip.classList.toggle('strip--wrapped', wraps(strip));
   }
 
   async function update() {
