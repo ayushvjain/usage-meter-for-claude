@@ -52,10 +52,13 @@
   const CSS = `
     :host { all: initial; }
     .strip {
+      /* Placed by anchorTo(): left/top are the middle of the composer's top edge, and the
+         translate lifts the strip clear of it. Without a composer it falls back to the
+         bottom of the window, which is what the .strip--loose class below does. */
       position: fixed;
       left: 50%;
-      bottom: 14px;
-      transform: translateX(-50%);
+      top: 0;
+      transform: translate(-50%, -100%);
       z-index: 2147483000;
       display: flex;
       align-items: center;
@@ -71,6 +74,7 @@
       line-height: 1.3;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
     }
+    .strip--loose { top: auto; bottom: 14px; transform: translateX(-50%); }
     .meter { display: flex; align-items: center; gap: 7px; min-width: 0; }
     .name { color: var(--muted); white-space: nowrap; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
@@ -93,6 +97,76 @@
     .close:hover { color: var(--text); }
     @media (max-width: 520px) { .reset { display: none; } }
   `;
+
+  /* ---------- Following the composer ---------- */
+
+  /*
+   * The strip belongs just above whatever you type into, wherever that is: centred low on
+   * an empty chat, at the bottom of a conversation, and higher as the box grows with a long
+   * prompt or an attachment. claude.ai's markup is its own and can change, so this looks for
+   * the message box by what it is rather than by any class name, and falls back to the
+   * bottom of the window when it can't find one.
+   */
+
+  const GAP = 8;
+
+  function isVisible(el) {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 120 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+  }
+
+  /** The box you type into: the editable area, or a plain textarea. */
+  function findInput() {
+    const candidates = [...document.querySelectorAll('div[contenteditable="true"], textarea')].filter(isVisible);
+    if (!candidates.length) return null;
+    // The composer is the lowest one on screen; an inline edit box higher up isn't it.
+    return candidates.sort((a, b) => a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom).pop();
+  }
+
+  /**
+   * The composer as drawn: the editable area plus the frame around it holding the attach and
+   * send buttons. Found by climbing out of the input while each parent is still roughly the
+   * same box, which stops at the visible card instead of the page.
+   */
+  function findComposer() {
+    const input = findInput();
+    if (!input) return null;
+    let node = input;
+    for (let guard = 0; guard < 8; guard += 1) {
+      const parent = node.parentElement;
+      if (!parent || parent === document.body || parent === document.documentElement) break;
+      const outer = parent.getBoundingClientRect();
+      const inner = node.getBoundingClientRect();
+      if (outer.width - inner.width > 160 || outer.height - inner.height > 160) break;
+      node = parent;
+    }
+    return node;
+  }
+
+  let lastAnchor = '';
+
+  /** Puts the strip just above the composer, and reports whether anything moved. */
+  function anchorTo(strip) {
+    const composer = findComposer();
+    if (!composer) {
+      strip.classList.add('strip--loose');
+      strip.style.left = '50%';
+      strip.style.top = '';
+      strip.style.maxWidth = '';
+      lastAnchor = 'loose';
+      return;
+    }
+    const rect = composer.getBoundingClientRect();
+    const top = Math.max(GAP + 28, rect.top - GAP); // never pushed off the top of the window
+    const centre = Math.min(Math.max(rect.left + rect.width / 2, 120), window.innerWidth - 120);
+    strip.classList.remove('strip--loose');
+    strip.style.left = `${Math.round(centre)}px`;
+    strip.style.top = `${Math.round(top)}px`;
+    // Never wider than what it sits on, so it reads as part of the composer.
+    strip.style.maxWidth = `${Math.round(Math.min(rect.width, window.innerWidth - 32))}px`;
+    lastAnchor = `${Math.round(centre)}:${Math.round(top)}`;
+    return composer;
+  }
 
   function mount() {
     const host = document.createElement('div');
@@ -196,6 +270,31 @@
     });
     strip.append(close);
     shadow.append(strip);
+    watch(anchorTo(strip));
+  }
+
+  /* The composer moves for reasons nothing reports: the box grows a line, an attachment
+     appears, the window resizes, or claude.ai swaps the whole thing out on navigation. So
+     the element itself is observed, the page is watched for it being replaced, and a slow
+     tick covers whatever both of those miss. */
+  let observed = null;
+  let resizeObserver = null;
+
+  function reposition() {
+    const strip = shadow && shadow.querySelector('.strip');
+    if (!strip) return;
+    const before = lastAnchor;
+    const composer = anchorTo(strip);
+    if (composer && composer !== observed) watch(composer);
+    return before !== lastAnchor;
+  }
+
+  function watch(composer) {
+    if (!composer || composer === observed) return;
+    if (!resizeObserver) resizeObserver = new ResizeObserver(() => reposition());
+    if (observed) resizeObserver.unobserve(observed);
+    observed = composer;
+    resizeObserver.observe(composer);
   }
 
   async function update() {
@@ -214,7 +313,23 @@
     setTimeout(update, 400);
   });
 
+  window.addEventListener('resize', reposition, { passive: true });
+  window.addEventListener('scroll', reposition, { passive: true, capture: true });
+
+  // claude.ai replaces its own tree as you move between chats; the composer that was being
+  // observed goes with it, so re-find it when the page settles.
+  let pending = null;
+  new MutationObserver(() => {
+    clearTimeout(pending);
+    pending = setTimeout(reposition, 120);
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
+  const anchorTimer = setInterval(reposition, 500);
+
   update();
   timer = setInterval(update, POLL_MS);
-  window.addEventListener('pagehide', () => clearInterval(timer));
+  window.addEventListener('pagehide', () => {
+    clearInterval(timer);
+    clearInterval(anchorTimer);
+  });
 })();
