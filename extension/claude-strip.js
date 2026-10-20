@@ -76,10 +76,12 @@
     .strip {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 14px;
-      width: max-content;
+      row-gap: 7px;
+      flex: 0 1 auto;
       max-width: 100%;
-      margin: 0 auto 8px;
+      margin-bottom: 8px;
       padding: 7px 10px 7px 13px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -88,6 +90,12 @@
       font-family: system-ui, "Segoe UI", -apple-system, sans-serif;
       font-size: 12px;
       line-height: 1.3;
+    }
+    /* The row the strip sits in, so the strip itself can be a flex item (see above). */
+    .row {
+      display: flex;
+      justify-content: center;
+      width: 100%;
     }
     /* No composer to sit above: float at the bottom of the window rather than vanish. */
     .strip--loose {
@@ -99,7 +107,10 @@
       margin: 0;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
     }
-    .meter { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    /* flex: none matters. Left shrinkable, a meter is squeezed narrower than its own text
+       once peak hours makes the row longer than the composer, and nowrap text then spills
+       over the divider beside it instead of the row growing or wrapping. */
+    .meter { display: flex; align-items: center; gap: 7px; flex: none; }
     .name { color: var(--muted); white-space: nowrap; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
     .track { width: 54px; height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; flex: none; }
@@ -120,6 +131,8 @@
     }
     .close:hover { color: var(--text); }
     .divider { width: 1px; align-self: stretch; background: var(--border); flex: none; }
+    /* On a wrapped line a divider would sit at the start of the row, marking nothing. */
+    .strip--wrapped .divider { display: none; }
     .gear { font-size: 13px; }
     @media (max-width: 520px) { .reset { display: none; } }
   `;
@@ -208,14 +221,18 @@
   let menuHost = null;
   let menuShadow = null;
   let menuOpen = false;
+  // Where the gear was when the menu opened. Toggling an item resizes the strip, which moves
+  // the gear; re-anchoring to it would slide the menu sideways under the pointer mid-click.
+  let menuAnchor = null;
 
   function closeMenu() {
     if (!menuOpen) return;
     menuOpen = false;
+    menuAnchor = null;
     if (menuHost) menuHost.remove();
   }
 
-  function toggleMenu(gear, settings) {
+  function toggleMenu(settings) {
     if (menuOpen) {
       closeMenu();
       return;
@@ -261,7 +278,6 @@
         item.setAttribute('aria-checked', String(next));
         const payload = await chrome.runtime.sendMessage({ type: 'setSetting', key: entry.key, value: next });
         if (payload && payload.state && payload.settings) render(payload.state, payload.settings);
-        position(panel, gear);
       });
       panel.append(item);
     }
@@ -283,12 +299,28 @@
     menuShadow.append(panel);
     document.documentElement.append(menuHost);
     menuOpen = true;
-    position(panel, gear);
+    const gear = shadow && shadow.querySelector('.gear');
+    menuAnchor = gear ? gear.getBoundingClientRect() : null;
+    position(panel);
   }
 
-  /** Above the gear, and never off the edge of the window. */
-  function position(panel, gear) {
-    const anchor = gear.getBoundingClientRect();
+  /** The menu holds the spot it opened at; a redraw underneath must not move it. */
+  function repositionMenu() {
+    if (!menuOpen || !menuShadow) return;
+    const panel = menuShadow.querySelector('.menu');
+    if (panel) position(panel);
+  }
+
+  /*
+   * Above the gear, and never off the edge of the window.
+   *
+   * The gear is looked up afresh every time rather than captured: each render replaces the
+   * whole strip, so a held reference becomes an element that is no longer in the page, whose
+   * rectangle is all zeros — which threw the menu into the top-left corner after every click.
+   */
+  function position(panel, anchorRect) {
+    const anchor = anchorRect || menuAnchor;
+    if (!anchor) return;
     const box = panel.getBoundingClientRect();
     const left = Math.max(8, Math.min(anchor.right - box.width, window.innerWidth - box.width - 8));
     const above = anchor.top - box.height - 8;
@@ -516,8 +548,10 @@
     if (hidden) return;
     if (!shadow) mount();
     const colours = palette(settings);
-    shadow.querySelectorAll('.strip').forEach((el) => el.remove());
+    shadow.querySelectorAll('.row, .strip').forEach((el) => el.remove());
 
+    const row = document.createElement('div');
+    row.className = 'row';
     const strip = document.createElement('div');
     strip.className = 'strip';
     Object.entries({ bg: colours.bg, border: colours.border, text: colours.text, muted: colours.muted, track: colours.track })
@@ -565,7 +599,7 @@
     gear.textContent = '⚙';
     gear.addEventListener('click', (event) => {
       event.stopPropagation();
-      toggleMenu(gear, settings);
+      toggleMenu(settings);
     });
     strip.append(gear);
 
@@ -577,11 +611,30 @@
     close.textContent = '×';
     close.addEventListener('click', () => {
       hidden = true;
-      shadow.querySelectorAll('.strip').forEach((el) => el.remove());
+      closeMenu();
+      shadow.querySelectorAll('.row').forEach((el) => el.remove());
     });
     strip.append(close);
-    shadow.append(strip);
+    row.append(strip);
+    shadow.append(row);
     place();
+    repositionMenu();
+
+    /* Dividers only make sense between items sharing a line, and whether the row wrapped is
+       something only the laid-out page knows. The dividers themselves are excluded from the
+       measurement: they stretch to the full height of the row, so their top never matches a
+       vertically centred item's and every row would otherwise look wrapped. */
+    requestAnimationFrame(() => {
+      const items = [...strip.children].filter((item) => !item.classList.contains('divider'));
+      if (items.length < 2) return;
+      /* Comparing the row's own height against its tallest item, rather than comparing the
+         items' tops to each other: items of different heights on one line (a button beside
+         a line of text) sit at different tops while sharing it. */
+      const style = getComputedStyle(strip);
+      const content = strip.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      const tallest = Math.max(...items.map((item) => item.getBoundingClientRect().height));
+      strip.classList.toggle('strip--wrapped', content > tallest + 2);
+    });
   }
 
   async function update() {
