@@ -40,6 +40,13 @@ const DEFAULT_SETTINGS = Object.freeze({
   showBadge: true,
   trackFreeUsage: false, // read Free-plan usage from claude.ai itself (see claude-page.js)
   showStrip: false, // show the figures on claude.ai itself (see claude-strip.js)
+  // What the strip shows, set from its own gear menu.
+  stripSession: true,
+  stripWeekly: true,
+  stripPeak: false,
+  stripSessionReset: true,
+  stripWeeklyReset: true,
+  stripBars: true,
   warnAt: 60,
   dangerAt: 85,
   orgId: null,
@@ -79,6 +86,9 @@ function cleanSettings(input) {
   s.showBadge = Boolean(s.showBadge);
   s.trackFreeUsage = Boolean(s.trackFreeUsage);
   s.showStrip = Boolean(s.showStrip);
+  for (const key of ['stripSession', 'stripWeekly', 'stripPeak', 'stripSessionReset', 'stripWeeklyReset', 'stripBars']) {
+    s[key] = Boolean(s[key]);
+  }
   s.style = core.STYLES.includes(s.style) ? s.style : DEFAULT_SETTINGS.style;
   s.theme = core.THEMES.includes(s.theme) ? s.theme : DEFAULT_SETTINGS.theme;
   s.accent = core.ACCENTS.includes(s.accent) ? s.accent : DEFAULT_SETTINGS.accent;
@@ -189,7 +199,7 @@ async function syncReader() {
     wanted.push({
       id: STRIP_ID,
       matches: ['https://claude.ai/*'],
-      js: ['claude-strip.js'],
+      js: ['shared/core.js', 'claude-strip.js'],
       runAt: 'document_idle',
     });
   }

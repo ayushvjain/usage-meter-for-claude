@@ -71,12 +71,18 @@ has and the widget does not.
 
 ## Settings
 
-Right-click the toolbar icon → **Options**, or **Settings…** in the popup's `⋯` menu.
+The strip carries its own: the **gear** on it opens a short menu for what it shows — session,
+weekly, peak hours, each reset time, and the bars — which is what people reach for while
+looking at it. Changes apply at once and follow you to every claude.ai tab.
+
+**Advanced settings…** at the bottom of that menu opens the full page, which is also where
+right-click the toolbar icon → **Options** and the popup's `⋯` menu go.
 
 - **General:** refresh interval (1 to 30 minutes), peak hours, the toolbar badge, and
   reading Free plan usage from claude.ai (see above).
 - **Appearance:** style (Cozy or Classic), theme (System, Dark or Light), accent colour, size,
-  and custom CSS.
+  and custom CSS. The strip follows all of it, except that on System it takes claude.ai's own
+  theme rather than the computer's, so it can't end up light on a dark page.
 - **Account:** which organization to show, if your account has more than one.
 - **About:** version and a link to this repository.
 

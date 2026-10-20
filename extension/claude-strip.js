@@ -60,7 +60,13 @@
     const dark = settings.theme === 'dark' || (settings.theme !== 'light' && pageIsDark());
     const style = settings.style === 'classic' ? 'classic' : 'cozy';
     const accent = ACCENTS[settings.accent] || ACCENTS.clay;
-    return { ...THEMES[`${style}-${dark ? 'dark' : 'light'}`], ok: dark ? accent[0] : accent[1], style };
+    return {
+      ...THEMES[`${style}-${dark ? 'dark' : 'light'}`],
+      ok: dark ? accent[0] : accent[1],
+      hover: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
+      onAccent: dark ? '#1b1510' : '#ffffff',
+      style,
+    };
   }
 
   const CSS = `
@@ -113,8 +119,197 @@
       cursor: pointer;
     }
     .close:hover { color: var(--text); }
+    .divider { width: 1px; align-self: stretch; background: var(--border); flex: none; }
+    .gear { font-size: 13px; }
     @media (max-width: 520px) { .reset { display: none; } }
   `;
+
+  /* ---------- The gear menu ---------- */
+
+  /*
+   * What the strip shows, chosen from the strip itself — the settings people reach for while
+   * looking at it. Everything else (theme, style, accent, size, the refresh interval, the
+   * toolbar badge) stays on the extension's own Settings page, one click away at the bottom.
+   *
+   * It lives in a second shadow host attached to the page root rather than inside the strip,
+   * because the strip sits inside claude.ai's composer, and anything that box clips or
+   * scrolls would clip the menu with it.
+   */
+
+  const MENU_ITEMS = [
+    { group: 'Show in strip' },
+    { key: 'stripSession', label: 'Session' },
+    { key: 'stripWeekly', label: 'Weekly' },
+    { key: 'stripPeak', label: 'Peak hours' },
+    { group: 'Details' },
+    { key: 'stripSessionReset', label: 'Session reset time' },
+    { key: 'stripWeeklyReset', label: 'Weekly reset time' },
+    { key: 'stripBars', label: 'Usage bars' },
+  ];
+
+  const MENU_CSS = `
+    :host { all: initial; }
+    .menu {
+      position: fixed;
+      z-index: 2147483001;
+      min-width: 210px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, "Segoe UI", -apple-system, sans-serif;
+      font-size: 13px;
+      line-height: 1.3;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+    }
+    .group {
+      padding: 8px 8px 4px;
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      width: 100%;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .item:hover { background: var(--hover); }
+    .box {
+      flex: none;
+      width: 15px; height: 15px;
+      display: grid; place-items: center;
+      border: 1.5px solid var(--muted);
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1;
+      color: transparent;
+    }
+    .item[aria-checked="true"] .box {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+    .rule { height: 1px; margin: 7px 4px; background: var(--border); }
+    .advanced { color: var(--muted); }
+    .advanced:hover { color: var(--text); }
+  `;
+
+  let menuHost = null;
+  let menuShadow = null;
+  let menuOpen = false;
+
+  function closeMenu() {
+    if (!menuOpen) return;
+    menuOpen = false;
+    if (menuHost) menuHost.remove();
+  }
+
+  function toggleMenu(gear, settings) {
+    if (menuOpen) {
+      closeMenu();
+      return;
+    }
+    const colours = palette(settings);
+    menuHost = document.createElement('div');
+    menuHost.id = 'usage-meter-strip-menu';
+    menuShadow = menuHost.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = MENU_CSS;
+    menuShadow.append(style);
+
+    const panel = document.createElement('div');
+    panel.className = 'menu';
+    panel.setAttribute('role', 'menu');
+    Object.entries({
+      bg: colours.bg, border: colours.border, text: colours.text, muted: colours.muted,
+      hover: colours.hover, accent: colours.ok, 'on-accent': colours.onAccent,
+    }).forEach(([name, value]) => panel.style.setProperty(`--${name}`, value));
+
+    for (const entry of MENU_ITEMS) {
+      if (entry.group) {
+        const heading = document.createElement('div');
+        heading.className = 'group';
+        heading.textContent = entry.group;
+        panel.append(heading);
+        continue;
+      }
+      const item = document.createElement('button');
+      item.className = 'item';
+      item.type = 'button';
+      item.setAttribute('role', 'menuitemcheckbox');
+      item.setAttribute('aria-checked', String(Boolean(settings[entry.key])));
+      const box = document.createElement('span');
+      box.className = 'box';
+      box.textContent = '✓';
+      const label = document.createElement('span');
+      label.textContent = entry.label;
+      item.append(box, label);
+      item.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const next = item.getAttribute('aria-checked') !== 'true';
+        item.setAttribute('aria-checked', String(next));
+        const payload = await chrome.runtime.sendMessage({ type: 'setSetting', key: entry.key, value: next });
+        if (payload && payload.state && payload.settings) render(payload.state, payload.settings);
+        position(panel, gear);
+      });
+      panel.append(item);
+    }
+
+    const rule = document.createElement('div');
+    rule.className = 'rule';
+    const advanced = document.createElement('button');
+    advanced.className = 'item advanced';
+    advanced.type = 'button';
+    advanced.setAttribute('role', 'menuitem');
+    advanced.textContent = 'Advanced settings…';
+    advanced.addEventListener('click', (event) => {
+      event.stopPropagation();
+      closeMenu();
+      chrome.runtime.sendMessage({ type: 'openOptions' }).catch(() => {});
+    });
+    panel.append(rule, advanced);
+
+    menuShadow.append(panel);
+    document.documentElement.append(menuHost);
+    menuOpen = true;
+    position(panel, gear);
+  }
+
+  /** Above the gear, and never off the edge of the window. */
+  function position(panel, gear) {
+    const anchor = gear.getBoundingClientRect();
+    const box = panel.getBoundingClientRect();
+    const left = Math.max(8, Math.min(anchor.right - box.width, window.innerWidth - box.width - 8));
+    const above = anchor.top - box.height - 8;
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(above >= 8 ? above : anchor.bottom + 8)}px`;
+  }
+
+  /* Listening in the capture phase means this runs before anything inside the menu, so a
+     click on a checkbox would close the menu before it could act on it. Shadow DOM hides
+     the real target from the event's `target` by design, so the composed path is what says
+     whether the click landed in the menu or the strip. */
+  document.addEventListener('click', (event) => {
+    if (!menuOpen) return;
+    const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+    if ((menuHost && path.includes(menuHost)) || (host && path.includes(host))) return;
+    closeMenu();
+  }, true);
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeMenu();
+  });
+  window.addEventListener('resize', closeMenu, { passive: true });
 
   /* ---------- Where the strip lives ---------- */
 
@@ -272,20 +467,49 @@
     const name = document.createElement('span');
     name.className = 'name';
     name.textContent = limit.kind === 'session' ? 'Session' : limit.scoped ? limit.label.replace(/^Weekly, /, '') : 'Weekly';
+    wrap.append(name);
 
-    const track = document.createElement('span');
-    track.className = 'track';
-    const fill = document.createElement('span');
-    fill.className = 'fill';
-    fill.style.width = `${Math.max(0, Math.min(100, limit.percent))}%`;
-    track.append(fill);
+    if (settings.stripBars) {
+      const track = document.createElement('span');
+      track.className = 'track';
+      const fill = document.createElement('span');
+      fill.className = 'fill';
+      fill.style.width = `${Math.max(0, Math.min(100, limit.percent))}%`;
+      track.append(fill);
+      wrap.append(track);
+    }
 
     const pct = document.createElement('span');
     pct.className = 'pct';
     pct.textContent = `${Math.round(limit.percent)}%`;
+    wrap.append(pct);
 
-    wrap.append(name, track, pct);
+    const wantsReset = limit.kind === 'session' ? settings.stripSessionReset : settings.stripWeeklyReset;
+    if (wantsReset && limit.resetsAt) {
+      const reset = document.createElement('span');
+      reset.className = 'reset';
+      reset.textContent = `· resets in ${countdown(limit.resetsAt)}`;
+      wrap.append(reset);
+    }
     return wrap;
+  }
+
+  /** Which limits the strip draws, in the order it draws them. */
+  function visibleLimits(state, settings) {
+    return (state.limits || []).filter((limit) => {
+      if (limit.kind === 'session') return settings.stripSession;
+      return settings.stripWeekly;
+    }).slice(0, 3);
+  }
+
+  /** Peak hours, the same schedule the widget and the popup use. */
+  function peakText() {
+    const core = window.UsageCore;
+    if (!core) return null;
+    const status = core.getPeakStatus(new Date());
+    if (!status.nextChange) return status.isPeak ? 'Peak hours' : 'Off-peak';
+    const left = core.formatDuration(status.nextChange.getTime() - Date.now());
+    return status.isPeak ? `Peak ends in ${left}` : `Peak in ${left}`;
   }
 
   function render(state, settings) {
@@ -300,15 +524,26 @@
       .forEach(([name, value]) => strip.style.setProperty(`--${name}`, value));
     strip.style.setProperty('--radius', colours.style === 'cozy' ? '14px' : '10px');
 
-    const limits = (state.limits || []).slice(0, 3);
+    const limits = visibleLimits(state, settings);
     if (limits.length) {
-      limits.forEach((limit) => strip.append(meter(limit, colours, settings)));
-      const session = limits.find((l) => l.kind === 'session') || limits[0];
-      if (session && session.resetsAt) {
-        const reset = document.createElement('span');
-        reset.className = 'reset';
-        reset.textContent = `resets in ${countdown(session.resetsAt)}`;
-        strip.append(reset);
+      limits.forEach((limit, i) => {
+        if (i) {
+          const divider = document.createElement('span');
+          divider.className = 'divider';
+          strip.append(divider);
+        }
+        strip.append(meter(limit, colours, settings));
+      });
+      if (settings.stripPeak) {
+        const peak = peakText();
+        if (peak) {
+          const divider = document.createElement('span');
+          divider.className = 'divider';
+          const note = document.createElement('span');
+          note.className = 'reset';
+          note.textContent = peak;
+          strip.append(divider, note);
+        }
       }
     } else {
       const note = document.createElement('span');
@@ -321,6 +556,18 @@
         : 'No usage to show yet.';
       strip.append(note);
     }
+
+    const gear = document.createElement('button');
+    gear.className = 'close gear';
+    gear.type = 'button';
+    gear.title = 'What the strip shows';
+    gear.setAttribute('aria-label', 'What the strip shows');
+    gear.textContent = '⚙';
+    gear.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleMenu(gear, settings);
+    });
+    strip.append(gear);
 
     const close = document.createElement('button');
     close.className = 'close';
