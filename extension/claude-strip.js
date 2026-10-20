@@ -38,12 +38,26 @@
     'classic-light': { bg: '#f7f9fc', border: 'rgba(16,28,48,0.12)', text: '#16202e', muted: '#5b6980', track: 'rgba(16,28,48,0.1)', warn: '#c4860a', danger: '#d2414d' },
   };
 
-  function prefersDark() {
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  /*
+   * On "System" the strip follows claude.ai rather than the operating system. They disagree
+   * more often than you would think — claude.ai keeps its own theme setting — and a light
+   * strip on a dark page is the one way this cannot help but look bolted on.
+   */
+  function pageIsDark() {
+    const root = document.documentElement;
+    if (root.classList.contains('dark') || root.dataset.theme === 'dark') return true;
+    if (root.classList.contains('light') || root.dataset.theme === 'light') return false;
+    const background = getComputedStyle(document.body || root).backgroundColor || '';
+    const rgb = background.match(/\d+(\.\d+)?/g);
+    if (rgb && rgb.length >= 3 && (rgb.length < 4 || Number(rgb[3]) > 0)) {
+      const [r, g, b] = rgb.map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b < 128;
+    }
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   }
 
   function palette(settings) {
-    const dark = settings.theme === 'dark' || (settings.theme !== 'light' && prefersDark());
+    const dark = settings.theme === 'dark' || (settings.theme !== 'light' && pageIsDark());
     const style = settings.style === 'classic' ? 'classic' : 'cozy';
     const accent = ACCENTS[settings.accent] || ACCENTS.clay;
     return { ...THEMES[`${style}-${dark ? 'dark' : 'light'}`], ok: dark ? accent[0] : accent[1], style };
@@ -51,20 +65,16 @@
 
   const CSS = `
     :host { all: initial; }
+    /* In the page's own flow, as a row above the composer, so claude.ai's layout makes
+       room for it instead of being covered. Only the fallback below floats. */
     .strip {
-      /* Placed by anchorTo(): left/top are the middle of the composer's top edge, and the
-         translate lifts the strip clear of it. Without a composer it falls back to the
-         bottom of the window, which is what the .strip--loose class below does. */
-      position: fixed;
-      left: 50%;
-      top: 0;
-      transform: translate(-50%, -100%);
-      z-index: 2147483000;
       display: flex;
       align-items: center;
       gap: 14px;
-      max-width: min(560px, calc(100vw - 32px));
-      padding: 8px 10px 8px 14px;
+      width: max-content;
+      max-width: 100%;
+      margin: 0 auto 8px;
+      padding: 7px 10px 7px 13px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: var(--bg);
@@ -72,9 +82,17 @@
       font-family: system-ui, "Segoe UI", -apple-system, sans-serif;
       font-size: 12px;
       line-height: 1.3;
+    }
+    /* No composer to sit above: float at the bottom of the window rather than vanish. */
+    .strip--loose {
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      z-index: 2147483000;
+      margin: 0;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
     }
-    .strip--loose { top: auto; bottom: 14px; transform: translateX(-50%); }
     .meter { display: flex; align-items: center; gap: 7px; min-width: 0; }
     .name { color: var(--muted); white-space: nowrap; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
@@ -98,82 +116,128 @@
     @media (max-width: 520px) { .reset { display: none; } }
   `;
 
-  /* ---------- Following the composer ---------- */
+  /* ---------- Where the strip lives ---------- */
 
   /*
-   * The strip belongs just above whatever you type into, wherever that is: centred low on
-   * an empty chat, at the bottom of a conversation, and higher as the box grows with a long
-   * prompt or an attachment. claude.ai's markup is its own and can change, so this looks for
-   * the message box by what it is rather than by any class name, and falls back to the
-   * bottom of the window when it can't find one.
+   * The strip goes into claude.ai's own layout, as a row directly above the composer, so
+   * the page makes room for it: nothing is covered, and it rises and falls with the box as
+   * that grows with a long prompt or an attachment, with no measuring or following to do.
+   *
+   * claude.ai's markup is its own and can change, so the composer is found by what it is —
+   * the editable area, then out to the <fieldset> or <form> around it — never by a class
+   * name. With no composer to be found (another part of the site, or markup this no longer
+   * recognises) the strip floats at the bottom of the window instead of disappearing.
    */
 
-  const GAP = 8;
+  let host = null;
 
-  function isVisible(el) {
-    const rect = el.getBoundingClientRect();
-    return rect.width > 120 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+  function findEditor() {
+    const candidates = [
+      ...document.querySelectorAll('div.ProseMirror[contenteditable="true"], [contenteditable="true"][role="textbox"], [contenteditable="true"], textarea'),
+    ].filter((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 120 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+    });
+    // The composer is the lowest editable box on screen; an edit box higher up is not it.
+    return candidates.sort((a, b) => a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom).pop() || null;
   }
 
-  /** The box you type into: the editable area, or a plain textarea. */
-  function findInput() {
-    const candidates = [...document.querySelectorAll('div[contenteditable="true"], textarea')].filter(isVisible);
-    if (!candidates.length) return null;
-    // The composer is the lowest one on screen; an inline edit box higher up isn't it.
-    return candidates.sort((a, b) => a.getBoundingClientRect().bottom - b.getBoundingClientRect().bottom).pop();
-  }
+  /** The element to put the strip in front of: the composer as the page lays it out. */
+  function findMountTarget() {
+    const editor = findEditor();
+    if (!editor) return null;
 
-  /**
-   * The composer as drawn: the editable area plus the frame around it holding the attach and
-   * send buttons. Found by climbing out of the input while each parent is still roughly the
-   * same box, which stops at the visible card instead of the page.
-   */
-  function findComposer() {
-    const input = findInput();
-    if (!input) return null;
-    let node = input;
-    for (let guard = 0; guard < 8; guard += 1) {
-      const parent = node.parentElement;
+    let wrapper = null;
+    let node = editor;
+    for (let i = 0; i < 12 && node.parentElement; i += 1) {
+      node = node.parentElement;
+      if (node.tagName === 'FIELDSET' || node.tagName === 'FORM') {
+        wrapper = node;
+        break;
+      }
+    }
+    // No form around it: climb out of the input while each parent is still roughly the same
+    // box, which stops at the visible composer card rather than at the page.
+    if (!wrapper) {
+      wrapper = editor;
+      for (let i = 0; i < 8; i += 1) {
+        const parent = wrapper.parentElement;
+        if (!parent || parent === document.body || parent === document.documentElement) break;
+        const outer = parent.getBoundingClientRect();
+        const inner = wrapper.getBoundingClientRect();
+        if (outer.width - inner.width > 160 || outer.height - inner.height > 160) break;
+        wrapper = parent;
+      }
+    }
+
+    // A row would put the strip beside the composer rather than above it, so climb until
+    // the parent stacks its children.
+    for (let i = 0; i < 4; i += 1) {
+      const parent = wrapper.parentElement;
       if (!parent || parent === document.body || parent === document.documentElement) break;
-      const outer = parent.getBoundingClientRect();
-      const inner = node.getBoundingClientRect();
-      if (outer.width - inner.width > 160 || outer.height - inner.height > 160) break;
-      node = parent;
+      const style = getComputedStyle(parent);
+      const isRow = style.display.includes('flex') && style.flexDirection.startsWith('row');
+      if (!isRow) break;
+      wrapper = parent;
     }
-    return node;
+    return wrapper.parentElement ? wrapper : null;
   }
 
-  let lastAnchor = '';
+  /*
+   * Re-inserting into someone else's React tree can turn into a fight: React removes the
+   * node it does not know about, this puts it back, and round it goes. A burst of
+   * re-inserts means that is happening, so the strip stops trying and floats instead.
+   */
+  const REINSERT_LIMIT = 12;
+  const REINSERT_WINDOW_MS = 5000;
+  let reinserts = [];
+  let floatOnly = false;
 
-  /** Puts the strip just above the composer, and reports whether anything moved. */
-  function anchorTo(strip) {
-    const composer = findComposer();
-    if (!composer) {
-      strip.classList.add('strip--loose');
-      strip.style.left = '50%';
-      strip.style.top = '';
-      strip.style.maxWidth = '';
-      lastAnchor = 'loose';
-      return;
+  /** Puts the strip where it belongs, in the page or floating, and says whether it moved. */
+  function place() {
+    if (!host || hidden) return false;
+    const strip = shadow.querySelector('.strip');
+
+    /* A page that rebuilds itself by re-serialising its HTML (claude.ai does, moving between
+       chats) copies this host as a plain, empty <div> — a shadow root does not survive being
+       written out as text. The copy keeps the id while the real host, with the strip in it,
+       is left detached. Clear out any such impostor before looking at where things stand. */
+    for (const other of document.querySelectorAll('#usage-meter-strip')) {
+      if (other !== host) other.remove();
     }
-    const rect = composer.getBoundingClientRect();
-    const top = Math.max(GAP + 28, rect.top - GAP); // never pushed off the top of the window
-    const centre = Math.min(Math.max(rect.left + rect.width / 2, 120), window.innerWidth - 120);
-    strip.classList.remove('strip--loose');
-    strip.style.left = `${Math.round(centre)}px`;
-    strip.style.top = `${Math.round(top)}px`;
-    // Never wider than what it sits on, so it reads as part of the composer.
-    strip.style.maxWidth = `${Math.round(Math.min(rect.width, window.innerWidth - 32))}px`;
-    lastAnchor = `${Math.round(centre)}:${Math.round(top)}`;
-    return composer;
+
+    const target = floatOnly ? null : findMountTarget();
+
+    if (!target) {
+      if (host.parentElement !== document.documentElement) document.documentElement.append(host);
+      host.style.cssText = '';
+      if (strip) strip.classList.add('strip--loose');
+      return true;
+    }
+
+    if (strip) strip.classList.remove('strip--loose');
+    // Stays as wide as its content, centred over the composer, never wider than the page.
+    host.style.cssText = 'display:block;width:100%;flex:none;align-self:stretch;';
+    if (host.nextElementSibling === target && host.parentElement === target.parentElement) return false;
+
+    const now = Date.now();
+    reinserts = reinserts.filter((at) => now - at < REINSERT_WINDOW_MS);
+    reinserts.push(now);
+    if (reinserts.length > REINSERT_LIMIT) {
+      floatOnly = true;
+      document.documentElement.append(host);
+      host.style.cssText = '';
+      if (strip) strip.classList.add('strip--loose');
+      return true;
+    }
+
+    target.parentElement.insertBefore(host, target);
+    return true;
   }
 
   function mount() {
-    const host = document.createElement('div');
+    host = document.createElement('div');
     host.id = 'usage-meter-strip';
-    // The page may re-render its own tree; keeping the host on documentElement keeps the
-    // strip out of anything claude.ai replaces.
-    (document.documentElement || document.body).append(host);
     shadow = host.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
     style.textContent = CSS;
@@ -270,31 +334,7 @@
     });
     strip.append(close);
     shadow.append(strip);
-    watch(anchorTo(strip));
-  }
-
-  /* The composer moves for reasons nothing reports: the box grows a line, an attachment
-     appears, the window resizes, or claude.ai swaps the whole thing out on navigation. So
-     the element itself is observed, the page is watched for it being replaced, and a slow
-     tick covers whatever both of those miss. */
-  let observed = null;
-  let resizeObserver = null;
-
-  function reposition() {
-    const strip = shadow && shadow.querySelector('.strip');
-    if (!strip) return;
-    const before = lastAnchor;
-    const composer = anchorTo(strip);
-    if (composer && composer !== observed) watch(composer);
-    return before !== lastAnchor;
-  }
-
-  function watch(composer) {
-    if (!composer || composer === observed) return;
-    if (!resizeObserver) resizeObserver = new ResizeObserver(() => reposition());
-    if (observed) resizeObserver.unobserve(observed);
-    observed = composer;
-    resizeObserver.observe(composer);
+    place();
   }
 
   async function update() {
@@ -313,18 +353,19 @@
     setTimeout(update, 400);
   });
 
-  window.addEventListener('resize', reposition, { passive: true });
-  window.addEventListener('scroll', reposition, { passive: true, capture: true });
-
-  // claude.ai replaces its own tree as you move between chats; the composer that was being
-  // observed goes with it, so re-find it when the page settles.
+  /* Being in the page's flow means the strip rides along with the composer on its own:
+     nothing to measure, nothing to follow. What does have to be watched is claude.ai
+     rebuilding its tree — moving between chats, or React re-rendering the composer — which
+     drops the strip out of the page. Then it goes back in. */
   let pending = null;
   new MutationObserver(() => {
+    if (hidden) return;
     clearTimeout(pending);
-    pending = setTimeout(reposition, 120);
+    pending = setTimeout(place, 150);
   }).observe(document.documentElement, { childList: true, subtree: true });
 
-  const anchorTimer = setInterval(reposition, 500);
+  // A backstop for a rebuild that somehow stirs no mutations this observer sees.
+  const anchorTimer = setInterval(place, 1500);
 
   update();
   timer = setInterval(update, POLL_MS);
