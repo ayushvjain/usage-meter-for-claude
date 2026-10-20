@@ -103,6 +103,8 @@
     const fill = document.createElement('div');
     fill.className = 'fill';
     fill.style.setProperty('--p', `${limit.percent}%`);
+    // Also on the track, so a style can draw the whole thing as one shape (Cozy's ring).
+    track.style.setProperty('--p', `${limit.percent}%`);
     track.append(fill);
 
     const reset = document.createElement('div');

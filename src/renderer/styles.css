@@ -634,103 +634,171 @@ body {
 
 /* ==========================================================================
    Cozy style (Settings > Appearance > Style)
-   A deliberate contrast with Classic: cool indigo surfaces instead of warm paper,
-   no serif anywhere, small capitalised labels, and thick, fully rounded bars.
-   Classic says notebook; this says instrument panel.
+   Not a recolouring of Classic but a different instrument: the session is a ring
+   gauge with the number inside it, the weekly limits are segmented gauges rather
+   than solid bars, the type is monospaced and set in small capitals, and the
+   corners are square. Classic is a notebook; this is a dashboard.
    ========================================================================== */
 
 :root[data-style="cozy"] {
+  --font: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
   --font-numbers: var(--font);
-  --radius: 20px;
-  --pad: 16px;
-  --hero-size: 36px;
-  --bar-height: 8px;
-  --hero-bar-height: 14px;
+  --radius: 6px;
+  --pad: 14px;
+  --hero-size: 23px;
+  --bar-height: 10px;
+  --hero-bar-height: 10px;
+  --ring: 78px;
 
-  /* Cool indigo night. */
-  --bg-rgb: 28, 31, 46;
-  --border: rgba(196, 204, 235, 0.14);
-  --text: #e8ebf6;
-  --muted: #959dbb;
-  --track: rgba(196, 204, 235, 0.13);
-  --hover: rgba(196, 204, 235, 0.09);
-  --warn: #e8b23c;
-  --danger: #ef6f78;
-  --peak: #9a8cf0;
-  --on-accent: #14172a;
+  /* Graphite and a thin green readout, like a meter rather than a page. */
+  --bg-rgb: 13, 15, 17;
+  --border: rgba(235, 245, 240, 0.1);
+  --text: #e7efea;
+  --muted: #7d8a85;
+  --track: rgba(235, 245, 240, 0.08);
+  --hover: rgba(235, 245, 240, 0.07);
+  --warn: #e3b341;
+  --danger: #f05c5c;
+  --peak: #56c6b0;
+  --on-accent: #0d0f11;
 }
 
 @media (prefers-color-scheme: light) {
   :root[data-style="cozy"]:not([data-theme="dark"]) {
-    --bg-rgb: 242, 244, 251;
-    --border: rgba(38, 43, 70, 0.13);
-    --text: #222638;
-    --muted: #646a85;
-    --track: rgba(38, 43, 70, 0.11);
-    --hover: rgba(38, 43, 70, 0.06);
-    --warn: #b07608;
-    --danger: #cc414b;
-    --peak: #6a57d2;
+    --bg-rgb: 250, 250, 249;
+    --border: rgba(15, 25, 20, 0.14);
+    --text: #10211b;
+    --muted: #5d6b65;
+    --track: rgba(15, 25, 20, 0.1);
+    --hover: rgba(15, 25, 20, 0.05);
+    --warn: #9a6c05;
+    --danger: #c3362f;
+    --peak: #15806d;
     --on-accent: #ffffff;
   }
 }
 
 :root[data-style="cozy"][data-theme="light"] {
-  --bg-rgb: 242, 244, 251;
-  --border: rgba(38, 43, 70, 0.13);
-  --text: #222638;
-  --muted: #646a85;
-  --track: rgba(38, 43, 70, 0.11);
-  --hover: rgba(38, 43, 70, 0.06);
-  --warn: #b07608;
-  --danger: #cc414b;
-  --peak: #6a57d2;
+  --bg-rgb: 250, 250, 249;
+  --border: rgba(15, 25, 20, 0.14);
+  --text: #10211b;
+  --muted: #5d6b65;
+  --track: rgba(15, 25, 20, 0.1);
+  --hover: rgba(15, 25, 20, 0.05);
+  --warn: #9a6c05;
+  --danger: #c3362f;
+  --peak: #15806d;
   --on-accent: #ffffff;
 }
 
-/* Small capitals for the labels, so the numbers carry the line on their own. */
-[data-style="cozy"] .title {
-  font-size: 11px;
+/* ---------- Type: small capitals, monospaced figures ---------- */
+
+[data-style="cozy"] .title,
+[data-style="cozy"] .limit-label,
+[data-style="cozy"] .peak-label {
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-[data-style="cozy"] .limit-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--muted);
+[data-style="cozy"] .limit-reset,
+[data-style="cozy"] .footer,
+[data-style="cozy"] .peak-countdown {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
 }
 
-[data-style="cozy"] .limit-value {
-  font-weight: 700;
-  letter-spacing: -0.01em;
+/* ---------- The session as a ring gauge ---------- */
+
+[data-style="cozy"] .limit--hero {
+  grid-template-columns: var(--ring) 1fr;
+  grid-template-areas:
+    "ring label"
+    "ring reset";
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 2px;
+  padding-bottom: 14px;
 }
 
+[data-style="cozy"] .limit--hero .limit-label {
+  grid-area: label;
+  align-self: end;
+}
+
+[data-style="cozy"] .limit--hero .limit-reset {
+  grid-area: reset;
+  align-self: start;
+}
+
+/* The track is the dial: a sweep of accent up to the percentage, the rest unlit,
+   with the middle punched out so it reads as a ring. */
+[data-style="cozy"] .limit--hero .track {
+  grid-area: ring;
+  width: var(--ring);
+  height: var(--ring);
+  border-radius: 50%;
+  background: conic-gradient(var(--level) 0 var(--p, 0%), var(--track) var(--p, 0%) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent 0 66%, #000 67%);
+  mask: radial-gradient(farthest-side, transparent 0 66%, #000 67%);
+}
+
+[data-style="cozy"] .limit--hero .fill {
+  display: none; /* the ring is the whole gauge */
+}
+
+/* The number sits in the middle of its own dial. */
 [data-style="cozy"] .limit--hero .limit-value {
-  letter-spacing: -0.03em;
+  grid-area: ring;
+  place-self: center;
+  font-size: var(--hero-size);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
 
-/* Thick, fully rounded bars: the instrument the panel is built around. */
+[data-style="cozy"] .limit--hero .limit-value small {
+  font-size: 0.5em;
+  color: var(--muted);
+}
+
+/* ---------- Weekly limits as segmented gauges ---------- */
+
 [data-style="cozy"] .track {
-  border-radius: 999px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, var(--track) 0 7px, transparent 7px 10px);
 }
 
 [data-style="cozy"] .fill {
-  box-shadow: 0 0 10px -2px var(--level);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(90deg, var(--level) 0 7px, transparent 7px 10px);
 }
 
-[data-style="cozy"] .peak-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+[data-style="cozy"] .limit {
+  row-gap: 7px;
 }
 
-/* Unlike Classic, the 24-hour strip stays: it suits a panel of instruments. */
+/* ---------- Everything else, squared off ---------- */
+
+[data-style="cozy"] .widget {
+  border-radius: var(--radius);
+}
+
+[data-style="cozy"] .peak {
+  padding-top: 12px;
+}
+
+[data-style="cozy"] .peak-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+}
+
 [data-style="cozy"] .day-strip,
 [data-style="cozy"] .strip-scale {
   display: block;
@@ -738,14 +806,28 @@ body {
 
 [data-style="cozy"] .strip-scale {
   display: flex;
+  font-size: 9px;
+  letter-spacing: 0.08em;
 }
 
-[data-style="cozy"] .primary-btn {
-  border-radius: 10px;
-  padding: 8px 16px;
-  letter-spacing: 0.02em;
+[data-style="cozy"] .day-strip {
+  height: 8px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, var(--track) 0 7px, transparent 7px 10px);
 }
 
+[data-style="cozy"] .day-strip .segment {
+  border-radius: 1px;
+}
+
+[data-style="cozy"] .primary-btn,
 [data-style="cozy"] .org-option {
-  border-radius: 12px;
+  border-radius: 3px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+[data-style="cozy"] .icon-btn {
+  border-radius: 3px;
 }

@@ -508,53 +508,72 @@ a.btn {
   border-radius: 999px;
 }
 
-/* ---------- Cozy style: the cool indigo panel, matching the widget ---------- */
+/* ---------- Cozy style: the graphite dashboard, matching the widget ---------- */
 
 :root[data-style="cozy"] {
-  --page: #1c1f2e;
-  --surface: #252939;
-  --nav: #171a27;
-  --border: rgba(196, 204, 235, 0.14);
-  --text: #e8ebf6;
-  --muted: #959dbb;
-  --hover: rgba(196, 204, 235, 0.08);
-  --on-accent: #14172a;
-  --danger: #ef6f78;
+  --page: #0d0f11;
+  --surface: #16191b;
+  --nav: #0a0c0d;
+  --border: rgba(235, 245, 240, 0.1);
+  --text: #e7efea;
+  --muted: #7d8a85;
+  --hover: rgba(235, 245, 240, 0.06);
+  --on-accent: #0d0f11;
+  --danger: #f05c5c;
 }
 
 @media (prefers-color-scheme: light) {
   :root[data-style="cozy"]:not([data-theme="dark"]) {
-    --page: #f2f4fb;
+    --page: #f4f4f2;
     --surface: #ffffff;
-    --nav: #e8ebf6;
-    --border: rgba(38, 43, 70, 0.13);
-    --text: #222638;
-    --muted: #646a85;
-    --hover: rgba(38, 43, 70, 0.05);
+    --nav: #ececea;
+    --border: rgba(15, 25, 20, 0.14);
+    --text: #10211b;
+    --muted: #5d6b65;
+    --hover: rgba(15, 25, 20, 0.05);
     --on-accent: #ffffff;
-    --danger: #cc414b;
+    --danger: #c3362f;
   }
 }
 
 :root[data-style="cozy"][data-theme="light"] {
-  --page: #f2f4fb;
+  --page: #f4f4f2;
   --surface: #ffffff;
-  --nav: #e8ebf6;
-  --border: rgba(38, 43, 70, 0.13);
-  --text: #222638;
-  --muted: #646a85;
-  --hover: rgba(38, 43, 70, 0.05);
+  --nav: #ececea;
+  --border: rgba(15, 25, 20, 0.14);
+  --text: #10211b;
+  --muted: #5d6b65;
+  --hover: rgba(15, 25, 20, 0.05);
   --on-accent: #ffffff;
-  --danger: #cc414b;
+  --danger: #c3362f;
 }
 
-/* No serif headings here, and squarer controls than Classic's pills. */
+/* Monospaced headings and small capitals in the navigation, squared off throughout. */
 [data-style="cozy"] .panel h1 {
-  font-family: var(--font);
-  letter-spacing: -0.01em;
+  font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
+[data-style="cozy"] .nav-item {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-radius: 3px;
+}
+
+[data-style="cozy"] .segmented,
 [data-style="cozy"] .segmented button,
-[data-style="cozy"] .btn {
-  border-radius: 9px;
+[data-style="cozy"] .btn,
+[data-style="cozy"] select,
+[data-style="cozy"] .card,
+[data-style="cozy"] .code {
+  border-radius: 3px;
+}
+
+[data-style="cozy"] .switch,
+[data-style="cozy"] .switch::after {
+  border-radius: 3px;
 }

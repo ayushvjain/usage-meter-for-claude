@@ -36,8 +36,8 @@
   const THEMES = {
     'classic-dark': { bg: '#292521', border: 'rgba(242,236,227,0.14)', text: '#f2ece3', muted: '#b5aa9b', track: 'rgba(242,236,227,0.12)', warn: '#e0a84e', danger: '#e06a52' },
     'classic-light': { bg: '#faf6ef', border: 'rgba(59,50,42,0.16)', text: '#3b322a', muted: '#857565', track: 'rgba(59,50,42,0.11)', warn: '#b8801c', danger: '#b84a33' },
-    'cozy-dark': { bg: '#1c1f2e', border: 'rgba(196,204,235,0.14)', text: '#e8ebf6', muted: '#959dbb', track: 'rgba(196,204,235,0.13)', warn: '#e8b23c', danger: '#ef6f78' },
-    'cozy-light': { bg: '#f2f4fb', border: 'rgba(38,43,70,0.13)', text: '#222638', muted: '#646a85', track: 'rgba(38,43,70,0.11)', warn: '#b07608', danger: '#cc414b' },
+    'cozy-dark': { bg: '#0d0f11', border: 'rgba(235,245,240,0.1)', text: '#e7efea', muted: '#7d8a85', track: 'rgba(235,245,240,0.08)', warn: '#e3b341', danger: '#f05c5c' },
+    'cozy-light': { bg: '#fafaf9', border: 'rgba(15,25,20,0.14)', text: '#10211b', muted: '#5d6b65', track: 'rgba(15,25,20,0.1)', warn: '#9a6c05', danger: '#c3362f' },
   };
 
   /*
@@ -119,7 +119,23 @@
     .meter { display: flex; align-items: center; gap: 7px; flex: none; }
     .name { color: var(--muted); white-space: nowrap; }
     /* Cozy's small capitals, so the strip matches the panel it belongs to. */
-    .name--caps { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+    .name--caps { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+    /* Cozy is a dashboard: monospaced figures, gauges lit in segments, square corners. */
+    .strip--cozy {
+      font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+    .strip--cozy .track {
+      height: 9px;
+      border-radius: 1px;
+      background: repeating-linear-gradient(90deg, var(--track) 0 6px, transparent 6px 8.5px);
+    }
+    .strip--cozy .fill {
+      border-radius: 0;
+      background: repeating-linear-gradient(90deg, var(--level) 0 6px, transparent 6px 8.5px);
+    }
+    .strip--cozy .close { border-radius: 2px; }
     .pct { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--level); }
     .track { width: 54px; height: 5px; border-radius: 999px; background: var(--track); overflow: hidden; flex: none; }
     /* A span is inline, and width and height do nothing to an inline box: without this the
@@ -695,7 +711,8 @@
     strip.className = 'strip';
     Object.entries({ bg: colours.bg, border: colours.border, text: colours.text, muted: colours.muted, track: colours.track })
       .forEach(([name, value]) => strip.style.setProperty(`--${name}`, value));
-    strip.style.setProperty('--radius', colours.style === 'cozy' ? '20px' : '14px');
+    strip.style.setProperty('--radius', colours.style === 'cozy' ? '5px' : '14px');
+    if (colours.style === 'cozy') strip.classList.add('strip--cozy');
 
     const limits = visibleLimits(state, settings);
     if (limits.length) {

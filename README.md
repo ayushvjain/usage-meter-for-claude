@@ -73,7 +73,7 @@ The widget sizes itself to your account: it's exactly as tall as its content and
 Open **Settings** from the `⋯` menu or the tray icon:
 
 - **General:** how often to refresh, whether to show peak hours, and whether to start with Windows. (In the Microsoft Store version, Windows manages this instead: Settings → Apps → Startup.)
-- **Appearance:** style (Classic, warm paper with serif numbers, or Cozy, a cool indigo panel with small capitals and thick bars), theme (System, Dark or Light), accent colour, background opacity, size (80% to 250%), and resetting the widget's position.
+- **Appearance:** style (Classic, warm paper with serif numbers, or Cozy, a graphite dashboard with a ring gauge and segmented bars), theme (System, Dark or Light), accent colour, background opacity, size (80% to 250%), and resetting the widget's position.
 - **Account:** sign in or out, choose the organization to show if your account has several, and open claude.ai.
 - **About:** version and a link to this repository.
 
