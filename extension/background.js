@@ -29,6 +29,7 @@ const STREAM_KEY = 'streamUsage';
 const READER_ID = 'claude-page-reader';
 const STRIP_ID = 'claude-usage-strip';
 const READER_STATS_KEY = 'readerStats';
+const TREND_KEY = 'trend';
 
 const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: core.DEFAULT_REFRESH_MINUTES,
@@ -45,6 +46,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   stripSession: true,
   stripWeekly: true,
   stripPeak: false,
+  stripTokens: true,
   stripSessionReset: true,
   stripWeeklyReset: true,
   stripBars: true,
@@ -71,6 +73,8 @@ const EMPTY_STATE = Object.freeze({
   // What the page reader has seen, so the UI can tell "no reply yet" from "replies this
   // cannot read" instead of waiting forever on either.
   reader: { completions: 0, timelines: 0, readings: 0, lastAt: null, error: null },
+  // Per limit: how fast it is climbing, and when it would run out at that pace.
+  trend: {},
 });
 
 /* ---------- Settings ---------- */
@@ -95,7 +99,7 @@ function cleanSettings(input) {
   s.showBadge = Boolean(s.showBadge);
   s.trackFreeUsage = Boolean(s.trackFreeUsage);
   s.showStrip = Boolean(s.showStrip);
-  for (const key of ['stripSession', 'stripWeekly', 'stripPeak', 'stripSessionReset', 'stripWeeklyReset', 'stripBars']) {
+  for (const key of ['stripSession', 'stripWeekly', 'stripPeak', 'stripTokens', 'stripSessionReset', 'stripWeeklyReset', 'stripBars']) {
     s[key] = Boolean(s[key]);
   }
   s.style = core.STYLES.includes(s.style) ? s.style : DEFAULT_SETTINGS.style;
@@ -138,6 +142,36 @@ async function setState(patch) {
   // No receiver while the popup is closed: that is normal, not an error.
   chrome.runtime.sendMessage({ type: 'state', state: next, settings }).catch(() => {});
   return next;
+}
+
+/* ---------- How fast each limit is being used ---------- */
+
+/*
+ * Readings are kept per limit so the UI can answer "how fast am I going through this?" and
+ * "how long have I got?". They live in local storage rather than in the worker, which is
+ * stopped and restarted constantly and would lose them within minutes.
+ */
+
+async function updateTrend(limits) {
+  const stored = await chrome.storage.local.get(TREND_KEY);
+  const history = stored[TREND_KEY] && typeof stored[TREND_KEY] === 'object' ? stored[TREND_KEY] : {};
+  const now = Date.now();
+  const next = {};
+  const trend = {};
+
+  for (const limit of limits) {
+    const samples = core.recordSample(history[limit.key], { percent: limit.percent, resetsAt: limit.resetsAt, at: now });
+    next[limit.key] = samples;
+    const perHour = core.usageRate(samples, { now });
+    trend[limit.key] = {
+      perHour,
+      etaMs: perHour === null ? null : core.timeToLimit({ percent: limit.percent, ratePerHour: perHour, resetsAt: limit.resetsAt, now }),
+      since: samples.length ? samples[0].at : null,
+    };
+  }
+
+  await chrome.storage.local.set({ [TREND_KEY]: next });
+  return trend;
 }
 
 /* ---------- Toolbar badge ---------- */
@@ -208,7 +242,7 @@ async function syncReader() {
     wanted.push({
       id: STRIP_ID,
       matches: ['https://claude.ai/*'],
-      js: ['shared/core.js', 'claude-strip.js'],
+      js: ['shared/core.js', 'claude-tokens.js', 'claude-strip.js'],
       runAt: 'document_idle',
     });
   }
@@ -376,6 +410,7 @@ async function runRefresh() {
         if (fromStream.length) limits = fromStream;
         await setState({
           status: 'ok',
+          trend: await updateTrend(limits),
           limits,
           fetchedAt: Date.now(),
           message: null,
@@ -502,7 +537,7 @@ const handlers = {
     // Show it at once, but only for the account the popup is actually showing, and only
     // where claude.ai itself reports nothing.
     if (state.unmetered && (!state.org || !org || state.org.uuid === org)) {
-      await setState({ limits: merged, source: 'stream', fetchedAt: Date.now() });
+      await setState({ limits: merged, source: 'stream', fetchedAt: Date.now(), trend: await updateTrend(merged) });
     }
     return { ok: true };
   },

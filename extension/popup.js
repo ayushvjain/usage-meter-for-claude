@@ -110,8 +110,21 @@
     reset.dataset.resetsAt = limit.resetsAt || '';
     reset.dataset.kind = limit.kind;
 
+    // The same pace the strip shows on hover, for anyone who lives in the popup instead.
+    const pace = paceFor(limit);
+    if (pace) row.title = pace;
+
     row.append(label, value, track, reset);
     return row;
+  }
+
+  /** "Using about 12% an hour — about 2h to 100% at this pace", when there is enough to say. */
+  function paceFor(limit) {
+    const entry = (state.trend || {})[limit.key];
+    if (!entry || !entry.perHour) return '';
+    const rate = entry.perHour >= 10 ? Math.round(entry.perHour) : Math.round(entry.perHour * 10) / 10;
+    const pace = `Using about ${rate}% an hour`;
+    return entry.etaMs ? `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at this pace.` : `${pace}.`;
   }
 
   /** One column of limits: the session first, then each weekly limit. */

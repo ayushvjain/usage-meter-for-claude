@@ -565,3 +565,70 @@ test('mergeStreamLimits drops a window whose reset has passed', () => {
   const stale = [{ key: 'stream:5h', kind: 'session', percent: 80, resetsAt: new Date(Date.now() - 60e3).toISOString() }];
   assert.deepStrictEqual(core.mergeStreamLimits(stale, []), []);
 });
+
+/* ---------- How fast a limit is being used ---------- */
+
+const HOUR_MS = 60 * 60 * 1000;
+
+function samplesOver(points, now, window = '2026-12-01T00:00:00Z') {
+  let history = [];
+  for (const [minutesAgo, percent] of points) {
+    history = core.recordSample(history, { percent, resetsAt: window, at: now - minutesAgo * 60 * 1000 });
+  }
+  return history;
+}
+
+test('recordSample keeps movement and collapses repeats', () => {
+  const now = Date.now();
+  const history = samplesOver([[60, 20], [40, 20], [20, 35], [0, 35]], now);
+  assert.deepStrictEqual(history.map((s) => s.percent), [20, 35]);
+});
+
+test('recordSample starts over when the window resets', () => {
+  const now = Date.now();
+  let history = samplesOver([[60, 80], [30, 95]], now);
+  history = core.recordSample(history, { percent: 2, resetsAt: '2026-12-08T00:00:00Z', at: now });
+  assert.deepStrictEqual(history.map((s) => s.percent), [2], 'readings from the old window must not linger');
+});
+
+test('recordSample forgets readings older than the window it can measure', () => {
+  const now = Date.now();
+  const history = samplesOver([[9 * 60, 5], [30, 40], [0, 50]], now);
+  assert.deepStrictEqual(history.map((s) => s.percent), [40, 50]);
+});
+
+test('usageRate measures percentage points an hour', () => {
+  const now = Date.now();
+  const history = samplesOver([[60, 20], [40, 30], [20, 40], [0, 50]], now);
+  assert.strictEqual(Math.round(core.usageRate(history, { now })), 30);
+});
+
+test('usageRate says nothing without enough to go on', () => {
+  const now = Date.now();
+  assert.strictEqual(core.usageRate([], { now }), null);
+  assert.strictEqual(core.usageRate(samplesOver([[0, 10]], now), { now }), null, 'one reading is not a rate');
+  const tooClose = samplesOver([[2, 10], [0, 12]], now);
+  assert.strictEqual(core.usageRate(tooClose, { now }), null, 'two minutes apart is rounding noise');
+});
+
+test('usageRate reports nothing moving as zero, never as negative', () => {
+  const now = Date.now();
+  assert.strictEqual(core.usageRate(samplesOver([[60, 40], [0, 40]], now), { now }), 0);
+  const dip = [{ at: now - HOUR_MS, percent: 40 }, { at: now, percent: 38 }];
+  assert.strictEqual(core.usageRate(dip, { now }), 0);
+});
+
+test('timeToLimit projects the rate out to 100%', () => {
+  const now = Date.now();
+  assert.strictEqual(core.timeToLimit({ percent: 50, ratePerHour: 25, now }), 2 * HOUR_MS);
+  assert.strictEqual(core.timeToLimit({ percent: 100, ratePerHour: 25, now }), null);
+  assert.strictEqual(core.timeToLimit({ percent: 10, ratePerHour: 0, now }), null);
+});
+
+test('timeToLimit stays quiet when the window resets first', () => {
+  const now = Date.now();
+  const soon = new Date(now + HOUR_MS).toISOString();
+  assert.strictEqual(core.timeToLimit({ percent: 50, ratePerHour: 25, resetsAt: soon, now }), null);
+  const later = new Date(now + 5 * HOUR_MS).toISOString();
+  assert.strictEqual(core.timeToLimit({ percent: 50, ratePerHour: 25, resetsAt: later, now }), 2 * HOUR_MS);
+});

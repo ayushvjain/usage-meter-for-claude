@@ -126,6 +126,8 @@
        bar renders as an empty track. The track itself escapes that only by being a flex item. */
     .fill { display: block; height: 100%; border-radius: inherit; background: var(--level); }
     .reset { color: var(--muted); white-space: nowrap; }
+    .tokens { color: var(--muted); white-space: nowrap; cursor: default; }
+    .meter { cursor: default; }
     .note { color: var(--muted); }
     /* The gear and the close button travel as one: a row that wraps must not leave a lone
        × stranded on a line of its own. */
@@ -147,6 +149,78 @@
     .gear { font-size: 13px; }
   `;
 
+  /* ---------- Tooltips ---------- */
+
+  /*
+   * Its own layer on the page root, for the same reason the menu has one: the strip lives
+   * inside claude.ai's composer, and anything that box clips would clip a tooltip with it.
+   */
+
+  const TIP_CSS = `
+    :host { all: initial; }
+    .tip {
+      position: fixed;
+      z-index: 2147483002;
+      max-width: 280px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, "Segoe UI", -apple-system, sans-serif;
+      font-size: 12px;
+      line-height: 1.45;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+      pointer-events: none;
+    }
+    .tip div + div { color: var(--muted); }
+  `;
+
+  let tipHost = null;
+
+  function hideTip() {
+    if (tipHost) tipHost.remove();
+    tipHost = null;
+  }
+
+  function showTip(anchor, lines, colours) {
+    hideTip();
+    const text = lines.filter(Boolean);
+    if (!text.length) return;
+    tipHost = document.createElement('div');
+    tipHost.id = 'usage-meter-strip-tip';
+    const shadowRoot = tipHost.attachShadow({ mode: 'open' });
+    const style = document.createElement('style');
+    style.textContent = TIP_CSS;
+    shadowRoot.append(style);
+
+    const tip = document.createElement('div');
+    tip.className = 'tip';
+    tip.setAttribute('role', 'tooltip');
+    Object.entries({ bg: colours.bg, border: colours.border, text: colours.text, muted: colours.muted })
+      .forEach(([name, value]) => tip.style.setProperty(`--${name}`, value));
+    for (const line of text) {
+      const row = document.createElement('div');
+      row.textContent = line;
+      tip.append(row);
+    }
+    shadowRoot.append(tip);
+    document.documentElement.append(tipHost);
+
+    const target = anchor.getBoundingClientRect();
+    const box = tip.getBoundingClientRect();
+    const left = Math.max(8, Math.min(target.left + target.width / 2 - box.width / 2, window.innerWidth - box.width - 8));
+    const above = target.top - box.height - 8;
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(above >= 8 ? above : target.bottom + 8)}px`;
+  }
+
+  /** Hovering any element with the lines it should explain itself with. */
+  function explains(el, colours, lines) {
+    el.addEventListener('mouseenter', () => showTip(el, lines(), colours));
+    el.addEventListener('mouseleave', hideTip);
+  }
+
   /* ---------- The gear menu ---------- */
 
   /*
@@ -164,6 +238,7 @@
     { key: 'stripSession', label: 'Session' },
     { key: 'stripWeekly', label: 'Weekly' },
     { key: 'stripPeak', label: 'Peak hours' },
+    { key: 'stripTokens', label: 'Chat size' },
     { group: 'Details' },
     { key: 'stripSessionReset', label: 'Session reset time' },
     { key: 'stripWeeklyReset', label: 'Weekly reset time' },
@@ -493,6 +568,30 @@
     return 'ok';
   }
 
+  function compact(n) {
+    if (n >= 1e6) return `${Math.round(n / 1e5) / 10}M`;
+    if (n >= 1e4) return `${Math.round(n / 1e3)}k`;
+    if (n >= 1e3) return `${Math.round(n / 100) / 10}k`;
+    return String(n);
+  }
+
+  /*
+   * The size of the conversation on screen, measured by claude-tokens.js. It is an estimate
+   * from the text itself — claude.ai publishes no token count for a chat — so it is always
+   * shown with a ~ and says so when hovered.
+   */
+  let tokenEstimate = null;
+
+  async function refreshTokens(state, { force = false } = {}) {
+    const api = window.__usageMeterTokensApi;
+    const orgId = state.org && state.org.uuid;
+    if (!api || !orgId) return;
+    const estimate = await api.current(orgId, { force });
+    const changed = JSON.stringify(estimate) !== JSON.stringify(tokenEstimate);
+    tokenEstimate = estimate;
+    if (changed) update();
+  }
+
   function countdown(iso) {
     if (!iso) return '';
     const left = new Date(iso).getTime() - Date.now();
@@ -506,7 +605,7 @@
     return `${m}m`;
   }
 
-  function meter(limit, colours, settings) {
+  function meter(limit, colours, settings, trend) {
     const wrap = document.createElement('span');
     wrap.className = 'meter';
     wrap.style.setProperty('--level', colours[levelFor(limit.percent, settings)]);
@@ -532,6 +631,8 @@
     pct.textContent = `${Math.round(limit.percent)}%`;
     wrap.append(pct);
 
+    explains(wrap, colours, () => paceLines(limit, trend));
+
     const wantsReset = limit.kind === 'session' ? settings.stripSessionReset : settings.stripWeeklyReset;
     if (wantsReset && limit.resetsAt) {
       const reset = document.createElement('span');
@@ -548,6 +649,28 @@
       if (limit.kind === 'session') return settings.stripSession;
       return settings.stripWeekly;
     }).slice(0, 3);
+  }
+
+  /** "12% an hour", or an honest word when there is not enough history to say. */
+  function paceLines(limit, trend) {
+    const core = window.UsageCore;
+    const entry = (trend || {})[limit.key];
+    const label = limit.kind === 'session' ? 'This session' : 'This week';
+
+    if (!entry || entry.perHour === null || entry.perHour === undefined) {
+      return [`${label}: ${Math.round(limit.percent)}% used`, 'Checking the pace — this needs a few minutes of readings.'];
+    }
+    if (entry.perHour === 0) {
+      return [`${label}: ${Math.round(limit.percent)}% used`, 'Not moving over the last hour.'];
+    }
+
+    const rate = entry.perHour >= 10 ? Math.round(entry.perHour) : Math.round(entry.perHour * 10) / 10;
+    const pace = `Using about ${rate}% an hour`;
+    if (entry.etaMs) {
+      return [`${label}: ${Math.round(limit.percent)}% used`, `${pace} — about ${core.formatDuration(entry.etaMs)} to 100% at this pace.`];
+    }
+    if (limit.percent >= 100) return [`${label}: at the limit`, `${pace} before it filled.`];
+    return [`${label}: ${Math.round(limit.percent)}% used`, `${pace}. It resets before running out at this pace.`];
   }
 
   /** Peak hours, the same schedule the widget and the popup use. */
@@ -582,8 +705,22 @@
           divider.className = 'divider';
           strip.append(divider);
         }
-        strip.append(meter(limit, colours, settings));
+        strip.append(meter(limit, colours, settings, state.trend));
       });
+      if (settings.stripTokens && tokenEstimate && tokenEstimate.conversation) {
+        const total = tokenEstimate.input + tokenEstimate.output;
+        const divider = document.createElement('span');
+        divider.className = 'divider';
+        const chat = document.createElement('span');
+        chat.className = 'tokens';
+        chat.textContent = `Chat ~${compact(total)} tokens`;
+        explains(chat, colours, () => [
+          `About ${compact(tokenEstimate.input)} in and ${compact(tokenEstimate.output)} out, over ${tokenEstimate.messages} message${tokenEstimate.messages === 1 ? '' : 's'}.`,
+          'Estimated from the text in this chat, at roughly four characters a token. Images and files are not counted.',
+        ]);
+        strip.append(divider, chat);
+      }
+
       if (settings.stripPeak) {
         const peak = peakText();
         if (peak) {
@@ -678,10 +815,24 @@
     strip.classList.toggle('strip--wrapped', wraps(strip));
   }
 
+  let lastConversation = null;
+
   async function update() {
     try {
       const payload = await chrome.runtime.sendMessage({ type: 'get' });
-      if (payload && payload.state && payload.settings) render(payload.state, payload.settings);
+      if (payload && payload.state && payload.settings) {
+        render(payload.state, payload.settings);
+        if (payload.settings.stripTokens) {
+          const api = window.__usageMeterTokensApi;
+          const here = api ? api.conversationId() : null;
+          if (here !== lastConversation) {
+            lastConversation = here;
+            if (api) api.invalidate();
+            tokenEstimate = null;
+            refreshTokens(payload.state);
+          }
+        }
+      }
     } catch {
       // The worker is restarting, or the extension was reloaded. Try again on the next tick.
     }
@@ -692,6 +843,11 @@
     if (event.source !== window || event.origin !== window.location.origin) return;
     if (!event.data || event.data.source !== 'usage-meter-reader') return;
     setTimeout(update, 400);
+    // A reply just landed, so the chat is bigger than the estimate on screen.
+    setTimeout(async () => {
+      const payload = await chrome.runtime.sendMessage({ type: 'get' }).catch(() => null);
+      if (payload && payload.settings && payload.settings.stripTokens) refreshTokens(payload.state, { force: true });
+    }, 1200);
   });
 
   /* Being in the page's flow means the strip rides along with the composer on its own:

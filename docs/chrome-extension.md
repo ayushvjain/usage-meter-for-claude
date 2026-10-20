@@ -69,6 +69,20 @@ request this reads, so they will see nothing. And the desktop widget cannot do a
 there is no claude.ai page for it to watch, so Free support is the one thing the extension
 has and the widget does not.
 
+## Pace, and the size of a chat
+
+Hovering a reading on the strip says how fast it is going: *"Using about 12% an hour — about
+2h to 100% at this pace."* The pace comes from readings kept over the last few hours, per
+limit and per window, so a reset starts the measurement again rather than averaging across
+it. Until there are a few minutes of readings it says so instead of guessing, and a limit
+that has not moved says that too. The same line is the popup's tooltip on each bar.
+
+The strip can also show the size of the conversation you have open — `Chat ~12k tokens`,
+with the split between what you sent and what came back on hover. claude.ai publishes no
+token count for a chat, so this is measured from the text itself at roughly four characters
+a token: an estimate, always shown with a `~`, and it counts text only, not images or files.
+Turn it off with **Chat size** in the gear menu.
+
 ## Settings
 
 The strip carries its own: the **gear** on it opens a short menu for what it shows — session,

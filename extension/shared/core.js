@@ -272,6 +272,87 @@
     return sortLimits(live);
   }
 
+  /* ---------- How fast a limit is being used ---------- */
+
+  /*
+   * A percentage on its own says where you are, not where you are heading. Keeping a short
+   * history of readings answers the two questions people actually have: how fast am I going
+   * through this window, and when do I run out if I carry on like this.
+   *
+   * Readings are kept per limit and per window: a reset starts a new window, and rates must
+   * never be measured across one. Only the last few hours are kept — a 5-hour window cannot
+   * use more than that, and the weekly one is read often enough that older points add
+   * nothing but storage.
+   */
+
+  const TREND_MAX_AGE_MS = 8 * HOUR;
+  const TREND_MIN_SPAN_MS = 4 * MINUTE; // below this the arithmetic is mostly rounding noise
+
+  /** Adds a reading, drops what is too old, and starts fresh when the window resets. */
+  function recordSample(history, { percent, resetsAt, at }) {
+    const samples = Array.isArray(history) ? history.slice() : [];
+    const value = Number(percent);
+    if (!Number.isFinite(value)) return samples;
+    const time = Number(at) || Date.now();
+    const window = resetsAt || null;
+
+    const sameWindow = samples.length === 0 || samples[samples.length - 1].window === window;
+    const kept = (sameWindow ? samples : []).filter((s) => time - s.at < TREND_MAX_AGE_MS);
+
+    const last = kept[kept.length - 1];
+    /* Readings arrive every few minutes and mostly repeat, so only movement is kept as a
+       point. A repeat extends the last one instead: without that, a limit that has not
+       moved for an hour collapses to a single reading, and "not moving" becomes
+       indistinguishable from "nothing measured yet". */
+    if (last && last.percent === value) {
+      last.until = time;
+      return kept;
+    }
+    kept.push({ at: time, until: time, percent: value, window });
+    return kept;
+  }
+
+  /**
+   * Percentage points per hour, measured over the readings inside `spanMs`, or null when
+   * there is not enough history yet to say anything honest.
+   */
+  function usageRate(history, { spanMs = 60 * MINUTE, now = Date.now() } = {}) {
+    const all = Array.isArray(history) ? history : [];
+    const samples = all.filter((s) => now - s.at <= spanMs);
+    const endOf = (sample) => sample.until || sample.at;
+
+    if (samples.length >= 2) {
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const elapsed = endOf(last) - first.at;
+      if (elapsed < TREND_MIN_SPAN_MS) return null;
+      const climb = last.percent - first.percent;
+      // A dip is two roundings disagreeing, not usage going backwards.
+      return climb > 0 ? (climb / elapsed) * HOUR : 0;
+    }
+
+    // One reading that has stood still long enough is a real answer: nothing is being used.
+    const latest = all[all.length - 1];
+    if (latest && endOf(latest) - latest.at >= TREND_MIN_SPAN_MS) return 0;
+    return null;
+  }
+
+  /**
+   * How long until this limit reaches 100% at that rate, in ms. null when it is not moving,
+   * when there is no rate yet, or when the window resets before it would run out — in which
+   * case the reset, not the rate, is what matters.
+   */
+  function timeToLimit({ percent, ratePerHour, resetsAt = null, now = Date.now() }) {
+    const left = 100 - Number(percent);
+    if (!(ratePerHour > 0) || !(left > 0)) return null;
+    const ms = (left / ratePerHour) * HOUR;
+    if (resetsAt) {
+      const reset = new Date(resetsAt).getTime();
+      if (Number.isFinite(reset) && reset - now <= ms) return null;
+    }
+    return ms;
+  }
+
   /* ---------- Organizations ---------- */
 
   /**
@@ -547,6 +628,9 @@
     peakSegmentsForLocalDay,
     localDayFraction,
     parseUsage,
+    recordSample,
+    usageRate,
+    timeToLimit,
     looksUnmetered,
     parseStreamWindows,
     mergeStreamLimits,
