@@ -79,8 +79,12 @@
       flex-wrap: wrap;
       gap: 11px;
       row-gap: 7px;
-      flex: 0 1 auto;
-      max-width: 100%;
+      /* Wider than the composer if that is what it takes to show what was asked for: the
+         strip is centred over the box, so the extra hangs evenly into the space beside it.
+         It does not shrink, because shrinking means wrapping, and wrapping is the last
+         resort here — but it never grows past the window. */
+      flex: 0 0 auto;
+      max-width: calc(100vw - 40px);
       margin-bottom: 8px;
       padding: 7px 10px 7px 13px;
       border: 1px solid var(--border);
@@ -135,9 +139,8 @@
     .close:hover { color: var(--text); }
     .divider { width: 1px; align-self: stretch; background: var(--border); flex: none; }
     /* On a wrapped line a divider would sit at the start of the row, marking nothing. */
-    .strip--wrapped .divider { display: none; }
+    .strip--wrapped { justify-content: center; row-gap: 8px; }
     .gear { font-size: 13px; }
-    @media (max-width: 520px) { .reset { display: none; } }
   `;
 
   /* ---------- The gear menu ---------- */
@@ -345,6 +348,10 @@
     if (event.key === 'Escape') closeMenu();
   });
   window.addEventListener('resize', closeMenu, { passive: true });
+  window.addEventListener('resize', () => {
+    const strip = shadow && shadow.querySelector('.strip');
+    if (strip) fit(strip);
+  }, { passive: true });
 
   /* ---------- Where the strip lives ---------- */
 
@@ -360,6 +367,7 @@
    */
 
   let host = null;
+  let stripResizeObserver = null;
 
   function findEditor() {
     const candidates = [
@@ -511,7 +519,6 @@
       fill.className = 'fill';
       fill.style.width = `${Math.max(0, Math.min(100, limit.percent))}%`;
       track.append(fill);
-      track.dataset.drop = 'bars';
       wrap.append(track);
     }
 
@@ -524,7 +531,6 @@
     if (wantsReset && limit.resetsAt) {
       const reset = document.createElement('span');
       reset.className = 'reset';
-      reset.dataset.drop = limit.kind === 'session' ? 'sessionReset' : 'weeklyReset';
       reset.textContent = `· resets in ${countdown(limit.resetsAt)}`;
       wrap.append(reset);
     }
@@ -578,10 +584,8 @@
         if (peak) {
           const divider = document.createElement('span');
           divider.className = 'divider';
-          divider.dataset.drop = 'peak';
           const note = document.createElement('span');
           note.className = 'reset';
-          note.dataset.drop = 'peak';
           note.textContent = peak;
           strip.append(divider, note);
         }
@@ -629,40 +633,43 @@
     place();
     repositionMenu();
 
+    /* One measurement is not enough: the row can reflow later, when a web font or an icon
+       finishes loading or claude.ai resizes the composer. Watching the strip's own size
+       catches all of that. It cannot oscillate, because the class it sets changes only how
+       the lines are spaced and aligned, never how wide the content is. */
     requestAnimationFrame(() => fit(strip));
+    if (!stripResizeObserver) stripResizeObserver = new ResizeObserver(() => {
+      const current = shadow && shadow.querySelector('.strip');
+      if (current) fit(current);
+    });
+    stripResizeObserver.disconnect();
+    stripResizeObserver.observe(strip);
   }
 
   /*
-   * Fitting the strip to the composer.
+   * Whether the row needs more than one line.
    *
-   * A narrow composer, a wide system font or an extra limit can all push the row past the
-   * width it has. Wrapping it is worse than it sounds: the line below holds whatever fell
-   * off the end, which is usually nothing but the two buttons. So detail is dropped instead,
-   * least useful first, until the row fits on one line — the percentages, which are the
-   * point of the strip, are the last thing to go and never do.
+   * Measured by height against the tallest item, not by comparing items' tops: items of
+   * different heights on one line (a button beside a line of text) sit at different tops
+   * while sharing it, which makes every row look wrapped.
+   *
+   * Nothing is hidden to make the row fit. An earlier version dropped detail — peak hours,
+   * then the reset times — when space ran short, and it read as the settings being ignored:
+   * switch something on, see nothing, with no way to tell why. A second line is honest.
    */
-  const SHEDDING_ORDER = ['peak', 'weeklyReset', 'sessionReset', 'bars'];
-
-  /** True while the row needs more than one line. Measured by height: items of different
-      heights on one line sit at different tops, so tops cannot answer this. */
   function wraps(strip) {
     const items = [...strip.children].filter((item) => !item.classList.contains('divider'));
     if (items.length < 2) return false;
     const style = getComputedStyle(strip);
-    const content = strip.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    // clientHeight is padding box, not border box: borders would otherwise read as a second
+    // line's worth of height and the row would look wrapped when it isn't.
+    const content = strip.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
     const tallest = Math.max(...items.map((item) => item.getBoundingClientRect().height));
-    return content > tallest + 2;
+    return content > tallest + 4;
   }
 
   function fit(strip) {
     if (!strip.isConnected) return;
-    for (const part of SHEDDING_ORDER) {
-      if (!wraps(strip)) break;
-      const droppable = strip.querySelectorAll(`[data-drop="${part}"]`);
-      if (!droppable.length) continue;
-      droppable.forEach((el) => el.remove());
-    }
-    // Still too long — two limits with long names, say — so let it wrap after all.
     strip.classList.toggle('strip--wrapped', wraps(strip));
   }
 
