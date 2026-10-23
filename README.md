@@ -1,3 +1,4 @@
+
 # Usage Meter for Claude
 
 A small Windows desktop widget that shows how much of your Claude plan you have used, when each limit resets, and whether Claude's peak hours are on right now.
@@ -80,10 +81,26 @@ Want to restyle it beyond that? **Settings → Appearance → Custom CSS → Ope
 
 You can also restyle any element, for example `.peak { display: none; }`. To go back to the default look, empty the file.
 
+## ESP32 Dashboard (Optional)
+
+Have an ESP32 with a display? Turn it into a physical Claude usage dashboard.
+
+Usage Meter for Claude can send your current session usage and reset time to an ESP32 over your local Wi-Fi network, keeping your physical display in sync with the desktop widget.
+
+- **Optional:** Disabled by default. Nothing changes for regular users.
+- **Automatic:** Updates whenever the desktop widget successfully refreshes.
+- **Local:** Sends only usage percentage and reset time to your configured device on your local network.
+
+Currently tested with the ESP32-2432S028 (2.8-inch CYD display). Support for multiple usage limits and additional displays is planned.
+
+**[ESP32 setup guide](docs/esp32-dashboard.md)**
+
+*ESP32 integration is currently available in the development source and has not yet been released through the Microsoft Store.*
+
 ## Privacy
 
 - Your claude.ai sign-in stays on your computer, in the widget's own browser profile. Sign out in Settings to delete it.
-- The widget only talks to claude.ai, to read your usage. No analytics, no telemetry, no third-party servers.
+- The widget reads usage from claude.ai. No analytics, no telemetry, no third-party servers. If you enable ESP32 support, it also sends usage percentage and reset time to your configured device over your local network.
 - It's open source, so you can read exactly what it does. See [PRIVACY.md](PRIVACY.md) for the full policy.
 
 ## Troubleshooting

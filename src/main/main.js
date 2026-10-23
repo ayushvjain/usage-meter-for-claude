@@ -1,7 +1,11 @@
+
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+
+const { sendUsageToCYD } = require('./cyd');
+
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, shell, nativeImage, nativeTheme } = require('electron');
 const { RefreshScheduler, parseUsage, gridLayout, snapToGrid, defaultTile, MIN_TILES, ACCENTS, STYLES, OPACITY_RANGE, SCALE_RANGE, clampScale } = require('../shared/core');
 const config = require('./config');
@@ -151,6 +155,10 @@ async function runRefresh() {
         orgCount: result.orgs.length,
         orgChoices: [],
       });
+
+      // Optional ESP32 integration. Uses the existing refresh interval.
+      // Errors are handled by cyd.js and do not interrupt the desktop widget.
+      sendUsageToCYD(state.limits, app.getPath('userData'));
     }
   } catch (err) {
     if (err instanceof AuthError) {
