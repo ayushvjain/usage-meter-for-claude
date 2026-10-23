@@ -81,12 +81,13 @@
       flex-wrap: wrap;
       gap: 11px;
       row-gap: 7px;
-      /* Wider than the composer if that is what it takes to show what was asked for: the
-         strip is centred over the box, so the extra hangs evenly into the space beside it.
-         It does not shrink, because shrinking means wrapping, and wrapping is the last
-         resort here — but it never grows past the window. */
-      flex: 0 0 auto;
-      max-width: calc(100vw - 40px);
+      /* Never wider than the composer it sits above. It may look like there is room beside
+         the box, but with a file open claude.ai splits the screen and that room belongs to
+         the other pane: a strip measured against the window is then wider than its own
+         column, and the column clips it at both ends. Too long for one line wraps to two. */
+      flex: 0 1 auto;
+      max-width: 100%;
+      min-width: 0;
       margin-bottom: 8px;
       padding: 7px 10px 7px 13px;
       border: 1px solid var(--border);
@@ -171,7 +172,19 @@
     .close:hover { color: var(--text); }
     .divider { width: 1px; align-self: stretch; background: var(--border); flex: none; }
     /* On a wrapped line a divider would sit at the start of the row, marking nothing. */
-    .strip--wrapped { justify-content: center; row-gap: 8px; }
+    /* Wrapped onto more than one line, two things go wrong on their own: a divider can end
+       a line, where it separates nothing, and the buttons can fall onto a line of their own.
+       The dividers are hidden rather than removed, so the row's width does not change and
+       the wrap cannot flip back and forth; the buttons come out of the flow entirely and
+       anchor to the top right, with room reserved so nothing runs under them. */
+    .strip--wrapped {
+      position: relative;
+      justify-content: center;
+      row-gap: 8px;
+      padding-right: 52px;
+    }
+    .strip--wrapped .divider { visibility: hidden; }
+    .strip--wrapped .tools { position: absolute; top: 6px; right: 10px; }
     .gear { font-size: 13px; }
   `;
 
