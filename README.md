@@ -12,7 +12,7 @@ It shows usage for paid plans: Pro, Max, Team and Enterprise. The widget shows w
   <img src="docs/screenshot-light.png" width="320" alt="Widget in light mode" />
 </p>
 
-If this saves you a few trips to Settings → Usage, a ⭐ on the repo would mean a lot. It helps other people find it.
+If this saves you a few trips to Settings â†’ Usage, a â­ on the repo would mean a lot. It helps other people find it.
 
 > Not affiliated with or endorsed by Anthropic. "Claude" is a trademark of Anthropic.
 
@@ -46,7 +46,7 @@ The widget sits on your desktop, like a large desktop icon: above the wallpaper,
 
 - **Move it:** drag it by its title. When you let go, it snaps to your desktop icon grid, or flush into a screen corner. It remembers where you put it.
 - **Resize it:** drag its bottom-right corner to make the whole widget bigger or smaller, for example on a large monitor. Double-click the corner to go back to 100%.
-- **Menu:** click the `⋯` button on the widget, or right-click the tray icon, for **Refresh now**, **Settings**, **Hide widget** and **Quit**. Clicking the tray icon hides or shows the widget.
+- **Menu:** click the `â‹¯` button on the widget, or right-click the tray icon, for **Refresh now**, **Settings**, **Hide widget** and **Quit**. Clicking the tray icon hides or shows the widget.
 
 The widget sizes itself to your account: it's exactly as tall as its content and just as wide, so it's a square with even spacing on every plan. Accounts with more limits get a bigger square.
 
@@ -58,16 +58,16 @@ The widget sizes itself to your account: it's exactly as tall as its content and
 
 ## Settings
 
-Open **Settings** from the `⋯` menu or the tray icon:
+Open **Settings** from the `â‹¯` menu or the tray icon:
 
-- **General:** how often to refresh, whether to show peak hours, and whether to start with Windows. (In the Microsoft Store version, Windows manages this instead: Settings → Apps → Startup.)
+- **General:** how often to refresh, whether to show peak hours, and whether to start with Windows. (In the Microsoft Store version, Windows manages this instead: Settings â†’ Apps â†’ Startup.)
 - **Appearance:** style (Cozy, with warm colours and serif numbers, or Classic), theme (System, Dark or Light), accent colour, background opacity, size (80% to 250%), and resetting the widget's position.
 - **Account:** sign in or out, choose the organization to show if your account has several, and open claude.ai.
 - **About:** version and a link to this repository.
 
 ### Custom CSS
 
-Want to restyle it beyond that? **Settings → Appearance → Custom CSS → Open CSS file** opens your own `theme.css`, which loads after the built-in styles. Save it and the widget updates within a second. Most changes only need a variable, for example:
+Want to restyle it beyond that? **Settings â†’ Appearance â†’ Custom CSS â†’ Open CSS file** opens your own `theme.css`, which loads after the built-in styles. Save it and the widget updates within a second. Most changes only need a variable, for example:
 
 ```css
 :root {
@@ -81,34 +81,18 @@ Want to restyle it beyond that? **Settings → Appearance → Custom CSS → Ope
 
 You can also restyle any element, for example `.peak { display: none; }`. To go back to the default look, empty the file.
 
-## ESP32 Dashboard (Optional)
-
-Have an ESP32 with a display? Turn it into a physical Claude usage dashboard.
-
-Usage Meter for Claude can send your current session usage and reset time to an ESP32 over your local Wi-Fi network, keeping your physical display in sync with the desktop widget.
-
-- **Optional:** Disabled by default. Nothing changes for regular users.
-- **Automatic:** Updates whenever the desktop widget successfully refreshes.
-- **Local:** Sends only usage percentage and reset time to your configured device on your local network.
-
-Currently tested with the ESP32-2432S028 (2.8-inch CYD display). Support for multiple usage limits and additional displays is planned.
-
-**[ESP32 setup guide](docs/esp32-dashboard.md)**
-
-*ESP32 integration is currently available in the development source and has not yet been released through the Microsoft Store.*
-
 ## Privacy
 
 - Your claude.ai sign-in stays on your computer, in the widget's own browser profile. Sign out in Settings to delete it.
-- The widget reads usage from claude.ai. No analytics, no telemetry, no third-party servers. If you enable ESP32 support, it also sends usage percentage and reset time to your configured device over your local network.
+- The widget reads usage from claude.ai. No analytics, no telemetry, no third-party servers.
 - It's open source, so you can read exactly what it does. See [PRIVACY.md](PRIVACY.md) for the full policy.
 
 ## Troubleshooting
 
 - **The widget shows an error instead of numbers.** claude.ai's usage data isn't an official, documented API, so it can change without notice. The widget shows an error rather than wrong numbers; check for an update.
-- **claude.ai shows a browser check.** Choose **Open claude.ai** in Settings → Account, let the page load, then click refresh.
+- **claude.ai shows a browser check.** Choose **Open claude.ai** in Settings â†’ Account, let the page load, then click refresh.
 - **Google sign-in is refused.** Some sign-in providers are strict about embedded browsers. Use the email option on the claude.ai sign-in page instead.
-- **The widget doesn't line up exactly with my icons.** It asks Windows for your desktop icon spacing; with unusual auto-arrange settings it can be a few pixels off. Settings → About shows the tile size it detected.
+- **The widget doesn't line up exactly with my icons.** It asks Windows for your desktop icon spacing; with unusual auto-arrange settings it can be a few pixels off. Settings â†’ About shows the tile size it detected.
 
 Found a bug or have an idea? [Open an issue](../../issues). The code is MIT-licensed, so you're also free to take it and make it your own.
 
