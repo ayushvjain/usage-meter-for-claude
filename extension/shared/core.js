@@ -369,6 +369,8 @@
    * average. null when the window length or its reset is unknown, or it has only just begun.
    */
   function averageRate({ percent, resetsAt, kind, windowMs = null, now = Date.now() }) {
+    // A provider that reports its own window length is believed over the fixed table, which
+    // exists only because claude.ai does not report one.
     const length = windowMs || WINDOW_MS[kind];
     if (!length || !resetsAt) return null;
     const reset = new Date(resetsAt).getTime();
@@ -394,6 +396,95 @@
       if (Number.isFinite(reset) && reset - now <= ms) return null;
     }
     return ms;
+  }
+
+  /* ---------- ChatGPT: the plan limits behind its Usage page ---------- */
+
+  /*
+   * ChatGPT answers with both windows in one object, and unlike claude.ai it says how long
+   * each window is, so nothing has to be assumed to work out a pace:
+   *
+   *   rate_limit.primary_window   { used_percent, limit_window_seconds, reset_at }   5 hours
+   *   rate_limit.secondary_window { ... }                                            7 days
+   *
+   * used_percent is a whole number (0-100), reset_at is unix seconds, and the window kind is
+   * read from its own length rather than its field name, so a change from five hours to
+   * three needs no code.
+   *
+   * These meters cover Codex, Work, Workspace Agents and ChatGPT for Excel. Chat
+   * conversations are NOT in them — the Usage page says so itself — which is why the labels
+   * name those surfaces instead of saying "ChatGPT". A full gauge beside the wrong name
+   * would read as "you have plenty left" to someone who had just been cut off mid-chat.
+   */
+
+  const CHATGPT = 'chatgpt';
+  const CHATGPT_SCOPE = 'Codex & Work';
+
+  function chatgptLabel(windowMs) {
+    if (!windowMs) return CHATGPT_SCOPE;
+    if (windowMs >= 6 * DAY) return `${CHATGPT_SCOPE}, weekly`;
+    if (windowMs >= DAY) return `${CHATGPT_SCOPE}, ${Math.round(windowMs / DAY)}-day`;
+    return `${CHATGPT_SCOPE}, ${Math.round(windowMs / HOUR)}-hour`;
+  }
+
+  /** The limits from ChatGPT's usage response, in the shape the rest of the app draws. */
+  function parseChatgptUsage(raw, now = Date.now()) {
+    const rate = raw && typeof raw === 'object' ? raw.rate_limit : null;
+    if (!rate || typeof rate !== 'object') return [];
+
+    const limits = [];
+    for (const field of ['primary_window', 'secondary_window']) {
+      const win = rate[field];
+      if (!win || typeof win !== 'object') continue;
+      const percent = Number(win.used_percent);
+      if (!Number.isFinite(percent)) continue;
+
+      const seconds = Number(win.limit_window_seconds);
+      const windowMs = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : null;
+      const resetAt = Number(win.reset_at);
+      const after = Number(win.reset_after_seconds);
+      const resetsAt =
+        Number.isFinite(resetAt) && resetAt > 0 ? new Date(resetAt * 1000).toISOString()
+        : Number.isFinite(after) && after >= 0 ? new Date(now + after * 1000).toISOString()
+        : null;
+
+      limits.push({
+        provider: CHATGPT,
+        key: `window:${field.replace('_window', '')}`,
+        label: chatgptLabel(windowMs),
+        // By length, not by name: "primary" is only the shorter of the two.
+        kind: windowMs && windowMs <= DAY ? 'session' : 'weekly',
+        scoped: false,
+        percent: clampPercent(percent),
+        resetsAt,
+        windowMs,
+      });
+    }
+    return sortLimits(limits);
+  }
+
+  /**
+   * The rest of that response: what plan it is, whether the limit has been hit, and the
+   * credits that keep Codex and Work running once it has. Separate from the limits because
+   * it is not a gauge — it is the context around one.
+   */
+  function parseChatgptStatus(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const rate = raw.rate_limit || {};
+    const credits = raw.credits || {};
+    const resets = raw.rate_limit_reset_credits || {};
+    const balance = Number(credits.balance);
+    return {
+      provider: CHATGPT,
+      plan: typeof raw.plan_type === 'string' ? raw.plan_type : null,
+      limitReached: Boolean(rate.limit_reached) || Boolean(credits.overage_limit_reached),
+      reachedType: typeof raw.rate_limit_reached_type === 'string' ? raw.rate_limit_reached_type : null,
+      credits: {
+        unlimited: Boolean(credits.unlimited),
+        balance: Number.isFinite(balance) ? balance : null,
+      },
+      resetCredits: Number(resets.available_count) || 0,
+    };
   }
 
   /* ---------- Organizations ---------- */
@@ -671,6 +762,8 @@
     peakSegmentsForLocalDay,
     localDayFraction,
     parseUsage,
+    parseChatgptUsage,
+    parseChatgptStatus,
     limitId,
     WINDOW_MS,
     recordSample,

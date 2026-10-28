@@ -673,3 +673,96 @@ test('averageRate and timeToLimit together give the projection', () => {
   const soon = core.timeToLimit({ percent: 80, ratePerHour: rate, resetsAt, now });
   assert.strictEqual(Math.round(soon / 60000), 80);
 });
+
+/* ---------- ChatGPT's plan limits ---------- */
+
+// Trimmed from a live response on a Plus account, 28 October 2026.
+const CHATGPT_USAGE = {
+  plan_type: 'plus',
+  rate_limit: {
+    allowed: true,
+    limit_reached: false,
+    primary_window: { used_percent: 0, limit_window_seconds: 18000, reset_after_seconds: 18000, reset_at: 1793174272 },
+    secondary_window: { used_percent: 0, limit_window_seconds: 604800, reset_after_seconds: 604800, reset_at: 1793761072 },
+  },
+  credits: { has_credits: false, unlimited: false, overage_limit_reached: false, balance: '0' },
+  rate_limit_reached_type: null,
+  rate_limit_reset_credits: { available_count: 0, applicable_available_count: 0 },
+};
+
+test('parseChatgptUsage turns both windows into limits', () => {
+  const limits = core.parseChatgptUsage(CHATGPT_USAGE);
+  assert.deepStrictEqual(limits.map((l) => [l.kind, l.label, l.percent]), [
+    ['session', 'Codex & Work, 5-hour', 0],
+    ['weekly', 'Codex & Work, weekly', 0],
+  ]);
+  assert.strictEqual(limits[0].provider, 'chatgpt');
+  assert.strictEqual(limits[0].resetsAt, new Date(1793174272 * 1000).toISOString(), 'reset_at is unix seconds');
+  assert.strictEqual(limits[0].windowMs, 18000 * 1000, 'the window length comes from the response');
+});
+
+test('parseChatgptUsage reads the window kind from its length, not its name', () => {
+  const swapped = {
+    rate_limit: {
+      // A shape where "primary" is the long one: the names must not decide.
+      primary_window: { used_percent: 10, limit_window_seconds: 604800, reset_at: 1793761072 },
+      secondary_window: { used_percent: 20, limit_window_seconds: 10800, reset_at: 1793174272 },
+    },
+  };
+  const limits = core.parseChatgptUsage(swapped);
+  assert.deepStrictEqual(limits.map((l) => [l.kind, l.label]), [
+    ['session', 'Codex & Work, 3-hour'],
+    ['weekly', 'Codex & Work, weekly'],
+  ]);
+});
+
+test('parseChatgptUsage falls back to the countdown when there is no timestamp', () => {
+  const now = Date.UTC(2026, 9, 28, 12, 0, 0);
+  const [limit] = core.parseChatgptUsage(
+    { rate_limit: { primary_window: { used_percent: 40, limit_window_seconds: 18000, reset_after_seconds: 3600 } } },
+    now,
+  );
+  assert.strictEqual(limit.resetsAt, new Date(now + 3600 * 1000).toISOString());
+});
+
+test('parseChatgptUsage ignores a response with nothing in it', () => {
+  assert.deepStrictEqual(core.parseChatgptUsage(null), []);
+  assert.deepStrictEqual(core.parseChatgptUsage({}), []);
+  assert.deepStrictEqual(core.parseChatgptUsage({ rate_limit: { primary_window: {} } }), []);
+});
+
+test('a ChatGPT limit is paced by its own window length', () => {
+  const now = Date.now();
+  // Two hours into the five-hour window the response describes, 30% used.
+  const [limit] = core.parseChatgptUsage({
+    rate_limit: {
+      primary_window: {
+        used_percent: 30,
+        limit_window_seconds: 18000,
+        reset_at: Math.round((now + 3 * HOUR_MS) / 1000),
+      },
+    },
+  }, now);
+  assert.strictEqual(Math.round(core.averageRate({ ...limit, now })), 15);
+});
+
+test('parseChatgptStatus reads the plan, the lockout and the credits', () => {
+  assert.deepStrictEqual(core.parseChatgptStatus(CHATGPT_USAGE), {
+    provider: 'chatgpt',
+    plan: 'plus',
+    limitReached: false,
+    reachedType: null,
+    credits: { unlimited: false, balance: 0 },
+    resetCredits: 0,
+  });
+  const locked = core.parseChatgptStatus({
+    rate_limit: { limit_reached: true },
+    rate_limit_reached_type: 'primary',
+    credits: { balance: '5', unlimited: false },
+    rate_limit_reset_credits: { available_count: 2 },
+  });
+  assert.strictEqual(locked.limitReached, true);
+  assert.strictEqual(locked.reachedType, 'primary');
+  assert.strictEqual(locked.credits.balance, 5);
+  assert.strictEqual(locked.resetCredits, 2);
+});

@@ -13,7 +13,7 @@ dates as expiry dates, not footnotes._
 | | Where usage comes from | What we can show | Confidence |
 | --- | --- | --- | --- |
 | **Claude** | `/api/organizations/<id>/usage` on paid plans; the `message_limit` event in the reply stream on Free | Percentage used and reset time, per window | **Built and working** |
-| **ChatGPT** | A usage view in the product: `chatgpt.com/settings/usage` | 5-hour and weekly windows for Codex, Work, Workspace Agents and Excel. **Not chat** | **Confirmed, and it measures the wrong thing** |
+| **ChatGPT** | `usage_limits`, behind `chatgpt.com/settings/usage` | 5-hour and weekly windows for Codex, Work, Workspace Agents and Excel, plus credits. **Not chat** | **Response captured, parser written and tested** |
 | **Gemini** | A usage view in the product: Settings → Usage limits on `gemini.google.com` | Percentage of the current allowance and of the weekly limit, with reset times | **Likely** — needs one spike |
 
 This supersedes an earlier assessment in which ChatGPT looked unreadable. At that point it
@@ -67,6 +67,55 @@ when each refreshes. Limits are **compute-based**, not a count of prompts — a 
 run costs far more than a question — and Google publishes tiers as multipliers (AI Plus 2×,
 AI Pro 4×, AI Ultra 5–20× Pro) rather than absolute numbers. Percentages and reset times are
 therefore the only honest things to show, which is exactly what we display.
+
+## What ChatGPT's response looks like
+
+Captured from a live Plus account on 28 October 2026. The request is named `usage_limits`
+in the network panel; its full URL still has to be noted before the adapter can call it.
+
+```json
+{
+  "plan_type": "plus",
+  "rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window":   { "used_percent": 0, "limit_window_seconds": 18000,  "reset_after_seconds": 18000,  "reset_at": 1793174272 },
+    "secondary_window": { "used_percent": 0, "limit_window_seconds": 604800, "reset_after_seconds": 604800, "reset_at": 1793761072 }
+  },
+  "credits": { "has_credits": false, "unlimited": false, "overage_limit_reached": false, "balance": "0" },
+  "rate_limit_reached_type": null,
+  "rate_limit_reset_credits": { "available_count": 0 }
+}
+```
+
+Everything worth knowing about it:
+
+- **Both windows arrive together.** 18000 seconds is the five-hour window, 604800 the week.
+- **It reports its own window length**, which claude.ai never does — so the average pace
+  needs no assumed five hours, and a change from five to three would need no code. The
+  parser reads the kind from the length rather than from the field name, since "primary"
+  only means the shorter of the two.
+- **`used_percent` is a whole number**, the opposite convention from Claude's stream, which
+  reports a fraction. Getting that backwards renders a maxed-out window as 1%.
+- **`reset_at` is unix seconds**, with `reset_after_seconds` as a countdown fallback.
+- **Credits are part of the same response.** Running out of them blocks Codex and Work just
+  as the limit does, and the page shows them, so the adapter reads them too.
+- `plan_type` gives a label for free.
+
+`src/shared/core.js` parses it today — `parseChatgptUsage` and `parseChatgptStatus`, with
+tests against this exact payload. What remains is the URL and a worker that calls it.
+
+### The other requests on that page
+
+- `plan_limit_history?days=7` answers `{ "periods": [], "approximate": true }` and
+  `plan_limit_balance_history` answers 404, which is why the page says "Balance history
+  isn't available yet". No history to read there yet.
+- `daily-workspace-usage-counts` and friends return a per-day series broken down by surface
+  (`cli`, `vscode`, `web`, `slack`, `github`, …) — but `"units": "percent"`, not tokens, and
+  only for the Codex and Work surfaces. Useful for the report later; not a token count.
+- An eligibility response (`show_usage_tab`, `show_credits`, …) says whether the account has
+  the usage page at all, which is the cheapest way to tell whether this provider is worth
+  showing for a given user.
 
 ## The spike, before any of it is built
 
@@ -156,6 +205,9 @@ Export as CSV and JSON, locally, with no server anywhere.
 
 - ~~Does ChatGPT's usage view cover ordinary chat messages?~~ **Answered: no.** The page
   states that chat conversations are excluded.
+- What is the full URL of ChatGPT's `usage_limits` request, and does it need anything the
+  page holds (a header, a token) or will cookies alone do? _(The last thing blocking the
+  adapter.)_
 - Does Gemini's view need a page-held token, or will cookies alone do from a content script?
 - Is Gemini's allowance whole-account, or split by surface the way ChatGPT's turns out to be?
   Worth settling early, since the same trap applies: a meter that looks like it covers the
