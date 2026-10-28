@@ -44,16 +44,18 @@ on the day this was investigated — these meters sit at 100% left and never mov
 them labelled "ChatGPT" would be worse than shipping nothing: a meter reading full while
 the user is locked out of the thing they are actually using.
 
-Two honest options, neither of them "ChatGPT usage":
+**Decided: ship it, under the name of what it measures.** The point of this extension is
+that nobody should have to open a settings page to find out where they stand, and that is
+as true of a Codex limit as a chat one. So the meter goes in — labelled **"Codex & Work"**,
+never "ChatGPT". The label is what keeps it honest: a full gauge next to that name is
+information, while a full gauge next to "ChatGPT" is a lie to anyone who only chats.
 
-1. **Ship it as what it is.** Label the provider "Codex & Work", not ChatGPT, and show it
-   only to people who use those surfaces. Small audience, accurate meter, little work —
-   the data shape already fits.
-2. **Count chat activity ourselves.** Messages sent per window, model used, and the lockout
-   notice when it appears, read from the page. That is an activity record, not a limit:
-   OpenAI does not publish the caps, they differ per plan and model and have moved several
-   times this year, so any percentage derived from them would be invented. It feeds the
-   report (which is built on activity anyway) and must never be drawn as a gauge.
+Chat usage stays unmeasured for now, because there is nothing to measure it against:
+OpenAI publishes no caps, they differ per plan and model and have moved several times this
+year, so any percentage would be invented. What can be counted honestly — messages per
+window, the model, and the lockout notice when it appears — is activity, not a limit. It
+belongs in the report, which is built on activity anyway, and must never be drawn as a
+gauge.
 
 Known gap either way: the upload-rate quota is not shown anywhere, by OpenAI's own account.
 
@@ -143,10 +145,10 @@ Export as CSV and JSON, locally, with no server anywhere.
 3. **History and export.** The differentiator, and useful before any second provider exists.
 4. **Spike Gemini**, then build the adapter if it pays off. Google documents the usage view,
    which makes it the better bet of the two.
-5. **ChatGPT, if at all.** Its meters are readable but cover Codex and Work rather than
-   chat, so there is no honest "ChatGPT usage" to show. Either ship them under their real
-   name — "Codex & Work" — or contribute chat activity to the report without a gauge. Decide
-   after the report exists, since that is where counted activity would land.
+5. **Codex & Work** (the ChatGPT page). Readable, and worth showing for the same reason as
+   everything else here: so nobody has to open a settings page to see it. Needs the request
+   behind that panel captured once — see the spike above. Chat activity, uncounted for now,
+   joins the report later.
 6. **Rename** only once a second provider actually works. "Usage Meter for Claude" with
    ChatGPT support is worse than either name chosen deliberately.
 

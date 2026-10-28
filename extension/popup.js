@@ -122,7 +122,7 @@
 
   /** "Using about 12% an hour — about 2h to 100% at this pace", when there is enough to say. */
   function paceFor(limit) {
-    const entry = (state.trend || {})[limit.key];
+    const entry = (state.trend || {})[core.limitId(limit)];
     const avg = entry && (entry.avgPerHour ?? entry.perHour);
     if (!avg) return '';
     const rate = avg >= 10 ? Math.round(avg) : Math.round(avg * 10) / 10;

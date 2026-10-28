@@ -94,6 +94,19 @@
    *    Other top-level keys (internal codenames such as "tangelo") are ignored.
    */
 
+  /*
+   * Which assistant a limit belongs to. There is one value today, and adding the field while
+   * that is true costs nothing; adding it once a second provider exists means touching the
+   * history store, the trend keys and everything that reads them at the same time as writing
+   * a new adapter. See docs/multi-provider.md.
+   */
+  const CLAUDE = 'claude';
+
+  /** A limit's identity across providers: two services may both call something "session". */
+  function limitId(limit) {
+    return `${limit.provider || CLAUDE}:${limit.key}`;
+  }
+
   const LEGACY_LABELS = {
     five_hour: 'Current session',
     seven_day: 'Weekly, all models',
@@ -146,6 +159,7 @@
         label = name ? `${base}, ${name}` : base;
       }
       limits.push({
+        provider: CLAUDE,
         key: `${group || 'limit'}:${name || 'all'}`,
         label,
         kind,
@@ -167,6 +181,7 @@
       if (value.utilization === null || value.utilization === undefined || !Number.isFinite(util)) continue;
       const suffix = key.startsWith('seven_day_') ? key.slice('seven_day_'.length) : '';
       limits.push({
+        provider: CLAUDE,
         key,
         label: LEGACY_LABELS[key] || 'Weekly, ' + titleCase(suffix.replace(/_/g, ' ')),
         kind: key === 'five_hour' ? 'session' : 'weekly',
@@ -241,6 +256,7 @@
       // decides: "98%" beside a composer that refuses to send reads as a broken meter.
       const exceeded = win.status === 'exceeded_limit';
       limits.push({
+        provider: CLAUDE,
         key: spec.key,
         label: spec.label,
         kind: spec.kind,
@@ -655,6 +671,7 @@
     peakSegmentsForLocalDay,
     localDayFraction,
     parseUsage,
+    limitId,
     WINDOW_MS,
     recordSample,
     usageRate,

@@ -162,8 +162,11 @@ async function updateTrend(limits) {
   const trend = {};
 
   for (const limit of limits) {
-    const samples = core.recordSample(history[limit.key], { percent: limit.percent, resetsAt: limit.resetsAt, at: now });
-    next[limit.key] = samples;
+    // Keyed by provider as well as limit: "session" will mean something different on each
+    // service, and the two must never share a history. See docs/multi-provider.md.
+    const id = core.limitId(limit);
+    const samples = core.recordSample(history[id] || history[limit.key], { percent: limit.percent, resetsAt: limit.resetsAt, at: now });
+    next[id] = samples;
     /* Two paces, and they answer different questions. The average over the whole window is
        available at once and drifts down while nothing is used, which is what someone waiting
        for a reset wants to watch. The last hour says what is happening right now, but needs
@@ -172,7 +175,7 @@ async function updateTrend(limits) {
     const avgPerHour = core.averageRate({ percent: limit.percent, resetsAt: limit.resetsAt, kind: limit.kind, now });
     const perHour = core.usageRate(samples, { now });
     const basis = avgPerHour === null ? perHour : avgPerHour;
-    trend[limit.key] = {
+    trend[id] = {
       avgPerHour,
       perHour,
       etaMs: basis === null ? null : core.timeToLimit({ percent: limit.percent, ratePerHour: basis, resetsAt: limit.resetsAt, now }),

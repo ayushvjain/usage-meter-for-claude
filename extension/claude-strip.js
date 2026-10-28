@@ -704,7 +704,7 @@
    */
   function paceLines(limit, trend) {
     const core = window.UsageCore;
-    const entry = (trend || {})[limit.key] || {};
+    const entry = (trend || {})[core.limitId(limit)] || {};
     const label = limit.kind === 'session' ? 'This session' : 'This week';
     const head = limit.percent >= 100 ? `${label}: at the limit` : `${label}: ${Math.round(limit.percent)}% used`;
     const avg = entry.avgPerHour;
