@@ -4,20 +4,22 @@ A plan for turning a Claude meter into one that covers all three assistants, and
 account of what each of them will actually tell us. Nothing here is built yet; the extension
 ships Claude only.
 
-_Last checked: 28 October 2026. Everything below is undocumented product surface and can
-change without notice — treat the dates as expiry dates, not footnotes._
+_Last checked: 28 October 2026, ChatGPT's page confirmed from a signed-in account.
+Everything below is undocumented product surface and can change without notice — treat the
+dates as expiry dates, not footnotes._
 
 ## What each service exposes
 
 | | Where usage comes from | What we can show | Confidence |
 | --- | --- | --- | --- |
 | **Claude** | `/api/organizations/<id>/usage` on paid plans; the `message_limit` event in the reply stream on Free | Percentage used and reset time, per window | **Built and working** |
-| **ChatGPT** | A usage view in the product: `chatgpt.com/settings/usage` | Percentage remaining and reset time for the 5-hour and weekly windows | **Likely** — needs one spike |
+| **ChatGPT** | A usage view in the product: `chatgpt.com/settings/usage` | 5-hour and weekly windows for Codex, Work, Workspace Agents and Excel. **Not chat** | **Confirmed, and it measures the wrong thing** |
 | **Gemini** | A usage view in the product: Settings → Usage limits on `gemini.google.com` | Percentage of the current allowance and of the weekly limit, with reset times | **Likely** — needs one spike |
 
 This supersedes an earlier assessment in which ChatGPT looked unreadable. At that point it
-had no usage view and OpenAI's own forums were full of requests for one; a usage page has
-since appeared. The lesson for this document: re-check before building, not before planning.
+had no usage view at all; one has since appeared. It turns out to report something other
+than what a ChatGPT user runs out of, which is a different problem and in some ways a worse
+one. The lesson stands either way: re-check before building, not before planning.
 
 ### Claude
 
@@ -28,14 +30,32 @@ event is read instead — see [chrome-extension.md](chrome-extension.md).
 
 ### ChatGPT
 
-A usage view exists at `chatgpt.com/settings/usage`. Third-party write-ups describe 5-hour
-and weekly meters with percentages and reset times, with the heaviest coverage around Codex
-and Work; how much of plain chat usage it reports, and on which plans, is the main thing the
-spike has to settle. The 5-hour window is described as rolling, opening with the first
-message after the previous one closed, which matches Claude's session window closely enough
-to share a data model.
+A usage view exists at `chatgpt.com/settings/usage`, and it is readable: two meters, "5-hour
+limit" and "Weekly limit", each with a percentage left and a reset countdown. The shape maps
+onto our model exactly.
 
-Known gap: upload-rate quota is not shown anywhere, by OpenAI's own account.
+It measures the wrong thing. The page says so itself, under the heading *Plan limits*:
+
+> Shared across Codex, Work, Workspace Agents, and ChatGPT for Excel.
+> **Chat conversations are not included.**
+
+So for someone who talks to ChatGPT — which is what almost everyone does, and what ran out
+on the day this was investigated — these meters sit at 100% left and never move. Shipping
+them labelled "ChatGPT" would be worse than shipping nothing: a meter reading full while
+the user is locked out of the thing they are actually using.
+
+Two honest options, neither of them "ChatGPT usage":
+
+1. **Ship it as what it is.** Label the provider "Codex & Work", not ChatGPT, and show it
+   only to people who use those surfaces. Small audience, accurate meter, little work —
+   the data shape already fits.
+2. **Count chat activity ourselves.** Messages sent per window, model used, and the lockout
+   notice when it appears, read from the page. That is an activity record, not a limit:
+   OpenAI does not publish the caps, they differ per plan and model and have moved several
+   times this year, so any percentage derived from them would be invented. It feeds the
+   report (which is built on activity anyway) and must never be drawn as a gauge.
+
+Known gap either way: the upload-rate quota is not shown anywhere, by OpenAI's own account.
 
 ### Gemini
 
@@ -123,16 +143,21 @@ Export as CSV and JSON, locally, with no server anywhere.
 3. **History and export.** The differentiator, and useful before any second provider exists.
 4. **Spike Gemini**, then build the adapter if it pays off. Google documents the usage view,
    which makes it the better bet of the two.
-5. **Spike ChatGPT**, then build the adapter. Settle the plain-chat question first — a meter
-   that only covers Codex is not what people expect from a ChatGPT usage meter.
+5. **ChatGPT, if at all.** Its meters are readable but cover Codex and Work rather than
+   chat, so there is no honest "ChatGPT usage" to show. Either ship them under their real
+   name — "Codex & Work" — or contribute chat activity to the report without a gauge. Decide
+   after the report exists, since that is where counted activity would land.
 6. **Rename** only once a second provider actually works. "Usage Meter for Claude" with
    ChatGPT support is worse than either name chosen deliberately.
 
 ## Open questions
 
-- Does ChatGPT's usage view cover ordinary chat messages, or only Codex and Work? On which
-  plans? _(Blocks step 5.)_
-- Does either view need a page-held token, or will cookies alone do from a content script?
+- ~~Does ChatGPT's usage view cover ordinary chat messages?~~ **Answered: no.** The page
+  states that chat conversations are excluded.
+- Does Gemini's view need a page-held token, or will cookies alone do from a content script?
+- Is Gemini's allowance whole-account, or split by surface the way ChatGPT's turns out to be?
+  Worth settling early, since the same trap applies: a meter that looks like it covers the
+  chat may not.
 - Gemini's compute-based limits have no prompt count. Does a percentage with no denominator
   read as useful, or as vague?
 - Three providers in one strip, or one strip per site showing only that site? _(Current
